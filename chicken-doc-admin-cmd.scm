@@ -12,11 +12,11 @@
       (print "usage: " (program-name) " COMMAND")
       (print "  -l           list repository information")
       (print "  -i           initialize repository non-destructively")
-      (print "  -d path      delete key path recursively (EMPTY PATH DELETES ENTIRE REPO)")
+      (print "  -d path      delete node path recursively (EMPTY PATH DELETES ENTIRE REPO)")
       (print "  -e dir       process svnwiki egg directory DIR")
       (print "  -m dir       process svnwiki manual directory DIR")
       (print "  -E file      process svnwiki egg file FILE")
-      (print "  -M file path process svnwiki man file FILE, placing at key path PATH")
+      (print "  -M file      process svnwiki man file FILE")
       (print "  -r           regenerate indices (required after -E or -M)")
       (exit 1))))
 

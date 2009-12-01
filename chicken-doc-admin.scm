@@ -185,6 +185,23 @@
     (and (regular-file? pathname)
          (parse-egg pathname `(,name)))))
 
+(define (parse-egg-directory dir type)
+  type ;ignored -- e.g. 'svnwiki
+  (with-global-write-lock
+   (lambda ()
+     (for-each (lambda (name)
+                 (when (parse-individual-egg (make-pathname dir name) 'svnwiki)
+                   (print name)))
+               (directory dir))
+     (refresh-id-cache))))
+
+(define (parse-individual-man pathname type)
+  type ;ignored
+  (let ((name (pathname-file pathname)))
+    (let ((path (man-filename->path name)))
+      (and path (regular-file? pathname)
+           (parse-man pathname path name)))))
+
 (define man-filename->path
   (let ((re:unit (irregex "^Unit (.*)"))
         (symbolify-list (lambda (x) (and x (map (lambda (x)
@@ -225,23 +242,6 @@
              ((string=? t "Using the interpreter")
               '(csi))
              (else #f))))))
-
-(define (parse-egg-directory dir type)
-  type ;ignored -- e.g. 'svnwiki
-  (with-global-write-lock
-   (lambda ()
-     (for-each (lambda (name)
-                 (when (parse-individual-egg (make-pathname dir name) 'svnwiki)
-                   (print name)))
-               (directory dir))
-     (refresh-id-cache))))
-
-(define (parse-individual-man pathname type)
-  type ;ignored
-  (let ((name (pathname-file pathname)))
-    (let ((path (man-filename->path name)))
-      (and path (regular-file? pathname)
-           (parse-man pathname path name)))))
 
 (define (parse-man-directory dir type)
   type ;ignored
