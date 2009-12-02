@@ -239,6 +239,9 @@
              ((string=? t "Modules and macros")
               '(chicken modules))                  ;; FIXME
 
+             ((string=? t "The R5RS standard")
+              '(scheme))
+
              ((string=? t "Using the interpreter")
               '(csi))
              (else #f))))))
