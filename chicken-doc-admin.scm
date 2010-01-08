@@ -29,7 +29,7 @@
     ;; Not currently recursive.
       (error "Already acquired global write lock"))
   (let ((out (open-output-file (make-pathname (repository-base) "lock"))))
-    (file-lock/blocking out)
+    #+(not mingw32) (file-lock/blocking out)
     (global-write-lock out)))
 (define (release-global-write-lock!)
   (unless (global-write-lock)
