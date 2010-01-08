@@ -47,9 +47,11 @@
                 (parse-man-directory (car r) 'svnwiki))
                ((string=? o "-E")
                 (unless (pair? r) (usage))
-                (parse-individual-egg (car r) 'svnwiki))
+                (unless (parse-individual-egg (car r) 'svnwiki)
+                  (error "Unable to parse egg file" (car r))))
                ((string=? o "-M")
                 (unless (pair? r) (usage))
-                (parse-individual-man (car r) 'svnwiki))
+                (unless (parse-individual-man (car r) 'svnwiki)
+                  (error "Unable to parse man file" (car r))))
                (else
                 (usage))))))
