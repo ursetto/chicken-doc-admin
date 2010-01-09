@@ -259,10 +259,13 @@
 ;;; ID search cache (write) -- perhaps should be in chicken-doc proper
 
 (define (write-id-cache!)
-  (let ((tmp-fn (string-append (id-cache-filename) ".tmp")))
+  (let* ((fn (id-cache-filename))
+         (tmp-fn (string-append fn ".tmp")))            ; fixme: mktmp
     (with-output-to-file tmp-fn
       (lambda () (write (hash-table->alist (id-cache)))))
-    (rename-file tmp-fn (id-cache-filename))
+    #+mingw32 (when (file-exists? fn)
+                (delete-file fn)) ;; Lose atomic update on MinGW.
+    (rename-file tmp-fn fn)
     (id-cache-mtime (current-seconds)
                     ;; (file-modification-time (id-cache-filename))
                     )))
