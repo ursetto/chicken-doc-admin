@@ -179,11 +179,13 @@
 
 ;;; svnwiki egg and man tree parsing
 
-(define (parse-individual-egg pathname type)
+;; Argument PATH allows computed path override.
+(define (parse-individual-egg pathname type #!optional (path #f))
   type ;ignored
   (let ((name (pathname-file pathname)))
     (and (regular-file? pathname)
-         (parse-egg pathname `(,name)))))
+         (parse-egg pathname
+                    (if path path `(,name))))))
 
 (define (parse-egg-directory dir type)
   type ;ignored -- e.g. 'svnwiki
