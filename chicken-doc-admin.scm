@@ -56,8 +56,9 @@
     (current-directory dir)
     (handle-exceptions exn (begin (current-directory old)
                                   (signal exn))
-      (thunk)
-      (current-directory old))))
+      (let ((rv (thunk)))
+        (current-directory old)
+        rv))))
 
 ;;; Lowlevel
 
@@ -179,29 +180,31 @@
        (close-output-port t))))
   #t)
 
-;; FIXME: Should cd to dest eggdoc dir (may require local files)
 (define (parse-egg/eggdoc fn path)
-  (let ((str
-         (condition-case
-          (eval `(begin
-                   (use eggdoc eggdoc-svnwiki)
-                   (eggdoc:warnings #f)
-                   (eggdoc:svnwiki-override!)
-                   (with-output-to-string
-                     (lambda ()
-                       ,@(read-file fn)))
-                   ))
-          (e (exn)
-             (apply warning
-                    (string-append "Parse failure: "
-                                   (let ((loc ((condition-property-accessor 'exn 'location) e)))
-                                     (if loc (conc loc ": ") ""))
-                                   (or ((condition-property-accessor 'exn 'message) e) ""))
-                    ((condition-property-accessor 'exn 'arguments) e))
-             #f))))
-    (and str
-         (parse-egg/svnwiki (open-input-string str)
-                            path))))
+  (let ((dir (pathname-directory fn))
+        (file (pathname-strip-directory fn)))
+    (let ((str
+           (condition-case
+            (with-cwd dir         ;; Change to eggdoc's basedir; may need local files
+                      (lambda ()       ;; with-cwd not visible in eval, so do it outside
+                        (let ((doc (read-file file)))
+                          (eval `(begin
+                                   (use eggdoc eggdoc-svnwiki)
+                                   (eggdoc:warnings #f)
+                                   (eggdoc:svnwiki-override!)
+                                   (with-output-to-string
+                                     (lambda () ,@doc)))))))
+            (e (exn)
+               (apply warning
+                      (string-append "Parse failure: "
+                                     (let ((loc ((condition-property-accessor 'exn 'location) e)))
+                                       (if loc (conc loc ": ") ""))
+                                     (or ((condition-property-accessor 'exn 'message) e) ""))
+                      ((condition-property-accessor 'exn 'arguments) e))
+               #f))))
+      (and str
+           (parse-egg/svnwiki (open-input-string str)
+                              path)))))
 
 ;;; svnwiki egg and man tree parsing
 
