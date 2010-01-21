@@ -71,15 +71,16 @@
           (list num title))
          (#f #f)))
 
-;; Read and parse svnwiki format text file at pathname FN and
+;; Read and parse svnwiki format text file at pathname (or port) FN and
 ;; write all tag groups using (WRITE-TAGS tags tag-body), where TAGS
 ;; is a list of (type signature identifier) records, and TAG-BODY
 ;; is a string containing the tag body for this tag group.  Additionally,
 ;; a transformed wiki document will be written to port PARSED-OUT.
 ;; (This API must change if the parsing gets any more complex.  We
 ;;  would probably just return an SXML document.)
-(define (parse-and-write-tags/svnwiki fn write-tags parsed-out)
-  (with-input-from-file fn
+(define (parse-and-write-tags/svnwiki fn-or-port write-tags parsed-out)
+  ((if (port? fn-or-port) with-input-from-port with-input-from-file)
+   fn-or-port
     (lambda ()
       (let loop ((line (read-line))
                  (section 1)

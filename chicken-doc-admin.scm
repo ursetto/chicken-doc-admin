@@ -2,6 +2,8 @@
 
 (include "chicken-doc-parser.scm")
 
+(use chicken-syntax) ; for eggdoc eval
+
 (module chicken-doc-admin
 ;; Used by chicken-doc-admin command
 (refresh-id-cache
@@ -177,6 +179,30 @@
        (close-output-port t))))
   #t)
 
+;; FIXME: Should cd to dest eggdoc dir (may require local files)
+(define (parse-egg/eggdoc fn path)
+  (let ((str
+         (condition-case
+          (eval `(begin
+                   (use eggdoc eggdoc-svnwiki)
+                   (eggdoc:warnings #f)
+                   (eggdoc:svnwiki-override!)
+                   (with-output-to-string
+                     (lambda ()
+                       ,@(read-file fn)))
+                   ))
+          (e (exn)
+             (apply warning
+                    (string-append "Parse failure: "
+                                   (let ((loc ((condition-property-accessor 'exn 'location) e)))
+                                     (if loc (conc loc ": ") ""))
+                                   (or ((condition-property-accessor 'exn 'message) e) ""))
+                    ((condition-property-accessor 'exn 'arguments) e))
+             #f))))
+    (and str
+         (parse-egg/svnwiki (open-input-string str)
+                            path))))
+
 ;;; svnwiki egg and man tree parsing
 
 ;; Argument PATH allows computed path override.
@@ -189,8 +215,8 @@
                        (if path path `(,name))))))
     ((eggdoc)
      (unless path
-       (error "Node path required for eggdoc"))
-     (error "eggdoc unimplemented"))
+       (error "Node path required for eggdoc type"))
+     (parse-egg/eggdoc pathname path))
     (else
      (error "Invalid document type" type))))
 
