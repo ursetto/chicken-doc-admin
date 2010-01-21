@@ -180,7 +180,17 @@
        (close-output-port t))))
   #t)
 
+(define eggdoc-svnwiki-available?
+  (let ((avail? (delay (condition-case
+                        (eval '(begin (use eggdoc-svnwiki eggdoc) #t))
+                        ((exn) #f)))))
+    (lambda ()
+      (force avail?))))
+
 (define (parse-egg/eggdoc fn path)
+  (unless (eggdoc-svnwiki-available?)
+    (##sys#clear-trace-buffer)           ; you are a horrible person
+    (error "eggdoc-svnwiki is required but not installed.\nUse `chicken-install eggdoc-svnwiki` to install it."))
   (let ((dir (pathname-directory fn))
         (file (pathname-strip-directory fn)))
     (let ((str
@@ -189,7 +199,7 @@
                       (lambda ()       ;; with-cwd not visible in eval, so do it outside
                         (let ((doc (read-file file)))
                           (eval `(begin
-                                   (use eggdoc eggdoc-svnwiki)
+                                   (use eggdoc) ; eggdoc-svnwiki loaded above
                                    (eggdoc:warnings #f)
                                    (eggdoc:svnwiki-override!)
                                    (with-output-to-string
@@ -202,6 +212,7 @@
                                      (or ((condition-property-accessor 'exn 'message) e) ""))
                       ((condition-property-accessor 'exn 'arguments) e))
                #f))))
+      ;(##sys#clear-trace-buffer)       ; we probably want a trace on eggdoc files
       (and str
            (parse-egg/svnwiki (open-input-string str)
                               path)))))
