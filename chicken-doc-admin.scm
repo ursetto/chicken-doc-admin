@@ -155,7 +155,7 @@
 ;; (define mandir (make-parameter
 ;;                 (make-pathname `(,+wikidir+ "man" "4") #f)))
 
-(define (parse-egg fn path)
+(define (parse-egg/svnwiki fn path)
   (with-global-write-lock
    (lambda ()
      (write-eggshell path)
@@ -166,7 +166,7 @@
        (close-output-port t))))
   #t)
 
-(define (parse-man fn path name)
+(define (parse-man/svnwiki fn path name)
   (with-global-write-lock
    (lambda ()
      (write-manshell path name)
@@ -181,18 +181,25 @@
 
 ;; Argument PATH allows computed path override.
 (define (parse-individual-egg pathname type #!optional (path #f))
-  type ;ignored
-  (let ((name (pathname-file pathname)))
-    (and (regular-file? pathname)
-         (parse-egg pathname
-                    (if path path `(,name))))))
+  (case type
+    ((svnwiki)
+     (let ((name (pathname-file pathname)))
+       (and (regular-file? pathname)
+            (parse-egg/svnwiki pathname
+                       (if path path `(,name))))))
+    ((eggdoc)
+     (unless path
+       (error "Node path required for eggdoc"))
+     (error "eggdoc unimplemented"))
+    (else
+     (error "Invalid document type" type))))
 
 (define (parse-egg-directory dir type)
   type ;ignored -- e.g. 'svnwiki
   (with-global-write-lock
    (lambda ()
      (for-each (lambda (name)
-                 (when (parse-individual-egg (make-pathname dir name) 'svnwiki)
+                 (when (parse-individual-egg (make-pathname dir name) type)
                    (print name)))
                (directory dir))
      (refresh-id-cache))))
@@ -202,7 +209,7 @@
   (let ((name (pathname-file pathname)))
     (let ((path (man-filename->path name)))
       (and path (regular-file? pathname)
-           (parse-man pathname path name)))))
+           (parse-man/svnwiki pathname path name)))))
 
 (define man-filename->path
   (let ((re:unit (irregex "^Unit (.*)"))
