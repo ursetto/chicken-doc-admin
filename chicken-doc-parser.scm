@@ -47,14 +47,26 @@
 (define +rx:deltable+
   (irregex '(or "<td>" "<th>" "</tr>"
                 (: "<" (? "/") "table" (* (~ ">")) ">"))))
+(define +rx:ivanism+
+  (irregex '(: ":" eos)))
 
 ;; Convert signature (usually a list or bare identifier) into an identifier
 ;; At the moment, this just means taking the car of a list if it's a list,
-;; and if it cannot be read as a scheme expression, fail
+;; or otherwise returning the read item.  If it cannot be read as a
+;; scheme expression, fail.
 (define (signature->identifier sig type)
   (condition-case
    (let ((L (with-input-from-string sig read)))
      (cond ((pair? L) (car L))
+           ((symbol? L)
+            ;; SPECIAL HANDLING: handle e.g. MPI:init:: -> MPI:init.
+            ;; Remove this once these signatures are normalized.
+            ;; (Warning: usually read as keywords, if so symbol->string
+            ;;  will strip one : itself)
+            (let ((str (irregex-replace +rx:ivanism+
+                                        (symbol->string L)
+                                        "")))
+              (if str (string->symbol str) L)))
            (else sig)))
    ((exn)
     (warning "Could not parse signature" sig)

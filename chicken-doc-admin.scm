@@ -269,6 +269,9 @@
        (else
         (error "Invalid egg directory type" type))))))
 
+;; Return list of eggdoc pathnames gathered from egg metadata in local
+;; repository DIR.  Latest tagged version (failing that, trunk) is used.
+;; Egg name is discarded--caller must gather it from the (name) elt in the doc.
 (define (gather-eggdoc-pathnames dir)
   (filter-map
    (lambda (egg)
