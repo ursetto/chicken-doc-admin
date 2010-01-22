@@ -193,17 +193,20 @@
     (error "eggdoc-svnwiki is required but not installed.\nUse `chicken-install eggdoc-svnwiki` to install it."))
   (let ((dir (pathname-directory fn))
         (file (pathname-strip-directory fn)))
-    (let ((str
+    (let ((result
            (condition-case
             (with-cwd dir         ;; Change to eggdoc's basedir; may need local files
                       (lambda ()       ;; with-cwd not visible in eval, so do it outside
-                        (let ((doc (read-file file)))
+                        (let ((doc (read-file file))
+                              (str (gensym 'str)))
                           (eval `(begin
                                    (use eggdoc) ; eggdoc-svnwiki loaded above
                                    (eggdoc:warnings #f)
                                    (eggdoc:svnwiki-override!)
-                                   (with-output-to-string
-                                     (lambda () ,@doc)))))))
+                                   (let ((,str (with-output-to-string
+                                                 (lambda () ,@doc))))
+                                     (cons (cons 'text ,str)
+                                           (eggdoc:result))))))))
             (e (exn)
                (apply warning
                       (string-append "Parse failure: "
@@ -213,23 +216,31 @@
                       ((condition-property-accessor 'exn 'arguments) e))
                #f))))
       ;(##sys#clear-trace-buffer)       ; we probably want a trace on eggdoc files
-      (and str
-           (parse-egg/svnwiki (open-input-string str)
-                              path)))))
+      (and (pair? result)
+           (let ((name (alist-ref 'name result))
+                 (text (alist-ref 'text result)))
+             (unless (or path name)
+               (error "Node path required for eggdocs"))
+             (unless path
+               (print name))
+             (let ((path (or path `(,name))))
+               (parse-egg/svnwiki (open-input-string text)
+                                  path)))))))
 
 ;;; svnwiki egg and man tree parsing
 
-;; Argument PATH allows computed path override.
+;; Argument PATH allows computed path override.  It should be a list of strings.
+;; The egg name SHOULD be printed to stdout if it is determined
+;; programmatically (i.e. if PATH is #f); that is either done here
+;; or in the individual parser if necessary.
 (define (parse-individual-egg pathname type #!optional (path #f))
   (case type
     ((svnwiki)
-     (let ((name (pathname-file pathname)))
+     (let ((basename (pathname-file pathname)))
        (and (regular-file? pathname)
             (parse-egg/svnwiki pathname
-                       (if path path `(,name))))))
+                               (or path `(,basename))))))
     ((eggdoc)
-     (unless path
-       (error "Node path required for eggdoc type"))
      (parse-egg/eggdoc pathname path))
     (else
      (error "Invalid document type" type))))
@@ -239,8 +250,8 @@
   (with-global-write-lock
    (lambda ()
      (for-each (lambda (name)
-                 (when (parse-individual-egg (make-pathname dir name) type)
-                   (print name)))
+                 (print name)
+                 (parse-individual-egg (make-pathname dir name) type))
                (directory dir))
      (refresh-id-cache))))
 
