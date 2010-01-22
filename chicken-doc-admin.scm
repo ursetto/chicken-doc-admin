@@ -19,6 +19,7 @@
 (import chicken-doc)
 (use matchable srfi-69 posix regex data-structures files extras srfi-13 srfi-1)
 (import irregex)
+(use setup-download)
 
 (import chicken-doc-parser)
 
@@ -255,8 +256,30 @@
                     (parse-individual-egg (make-pathname dir name) type))
                   (directory dir))
         (refresh-id-cache))
+
+       ((eggdoc)
+        (print "Gathering egg information...")
+        (let ((re:dir (irregex `(: bos ,(make-pathname dir ""))))) ; strip off dir name
+          (for-each (lambda (pathname)
+                      (let ((pretty-path
+                             (string-substitute re:dir "" pathname)))
+                        (display pretty-path) (display " -> ") (flush-output)
+                        (parse-individual-egg pathname type)))
+                    (gather-eggdoc-pathnames dir))))
        (else
         (error "Invalid egg directory type" type))))))
+
+(define (gather-eggdoc-pathnames dir)
+  (filter-map
+   (lambda (egg)
+     (let ((x (alist-ref 'eggdoc (cdr egg))))
+       (and x
+            (pair? x)      ; the occasional egg may just have (eggdoc)
+            (let* ((egg-name (->string (car egg)))
+                   (filename (car x))
+                   (pathname (locate-egg/local egg-name dir)))
+              (make-pathname pathname filename)))))
+   (gather-egg-information dir)))
 
 (define (parse-individual-man pathname type)
   (case type
