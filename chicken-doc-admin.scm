@@ -254,8 +254,7 @@
         (for-each (lambda (name)
                     (print name)
                     (parse-individual-egg (make-pathname dir name) type))
-                  (directory dir))
-        (refresh-id-cache))
+                  (directory dir)))
 
        ((eggdoc)
         (print "Gathering egg information...")
@@ -267,7 +266,8 @@
                         (parse-individual-egg pathname type)))
                     (gather-eggdoc-pathnames dir))))
        (else
-        (error "Invalid egg directory type" type))))))
+        (error "Invalid egg directory type" type)))
+     (refresh-id-cache))))
 
 ;; Return list of eggdoc pathnames gathered from egg metadata in local
 ;; repository DIR.  Latest tagged version (failing that, trunk) is used.
