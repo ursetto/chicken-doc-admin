@@ -243,24 +243,30 @@
     ((eggdoc)
      (parse-egg/eggdoc pathname path))
     (else
-     (error "Invalid document type" type))))
+     (error "Invalid egg document type" type))))
 
 (define (parse-egg-directory dir type)
-  type ;ignored -- e.g. 'svnwiki
   (with-global-write-lock
    (lambda ()
-     (for-each (lambda (name)
-                 (print name)
-                 (parse-individual-egg (make-pathname dir name) type))
-               (directory dir))
-     (refresh-id-cache))))
+     (case type
+       ((svnwiki)
+        (for-each (lambda (name)
+                    (print name)
+                    (parse-individual-egg (make-pathname dir name) type))
+                  (directory dir))
+        (refresh-id-cache))
+       (else
+        (error "Invalid egg directory type" type))))))
 
 (define (parse-individual-man pathname type)
-  type ;ignored
-  (let ((name (pathname-file pathname)))
-    (let ((path (man-filename->path name)))
-      (and path (regular-file? pathname)
-           (parse-man/svnwiki pathname path name)))))
+  (case type
+    ((svnwiki)
+     (let ((name (pathname-file pathname)))
+       (let ((path (man-filename->path name)))
+         (and path (regular-file? pathname)
+              (parse-man/svnwiki pathname path name)))))
+    (else
+     (error "Invalid man document type" type))))
 
 (define man-filename->path
   (let ((re:unit (irregex "^Unit (.*)"))
@@ -307,14 +313,17 @@
              (else #f))))))
 
 (define (parse-man-directory dir type)
-  type ;ignored
   (with-global-write-lock
    (lambda ()
-     (for-each (lambda (name)
-                 (when (parse-individual-man (make-pathname dir name) 'svnwiki)
-                   (print name)))
-               (directory dir))
-     (refresh-id-cache))))
+     (case type
+       ((svnwiki)
+        (for-each (lambda (name)
+                    (print name)
+                    (parse-individual-man (make-pathname dir name) 'svnwiki))
+                  (directory dir))
+        (refresh-id-cache))
+       (else
+        (error "Invalid man directory type" type))))))
 
 ;;; ID search cache (write) -- perhaps should be in chicken-doc proper
 
