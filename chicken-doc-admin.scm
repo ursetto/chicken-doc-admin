@@ -252,8 +252,11 @@
      (case type
        ((svnwiki)
         (for-each (lambda (name)
-                    (print name)
-                    (parse-individual-egg (make-pathname dir name) type))
+                    (when (parse-individual-egg (make-pathname dir name) type)
+                      ;; Must print ONLY after successful parse, otherwise
+                      ;; directories etc. will show up.  Any parse warnings
+                      ;; will occur before the name appears.
+                      (print name)))
                   (directory dir)))
 
        ((eggdoc)
@@ -344,8 +347,8 @@
      (case type
        ((svnwiki)
         (for-each (lambda (name)
-                    (print name)
-                    (parse-individual-man (make-pathname dir name) 'svnwiki))
+                    (when (parse-individual-man (make-pathname dir name) 'svnwiki)
+                      (print name)))
                   (directory dir))
         (refresh-id-cache))
        (else
