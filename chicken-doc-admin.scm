@@ -246,6 +246,12 @@
     (else
      (error "Invalid egg document type" type))))
 
+(define ignore-filename?
+  ;; Ignore not just #*# but #* due to issue with r/w invariance on sharp-syntax
+  (let ((re:ignore (regexp "^#|\\.swp$|~$")))
+    (lambda (fn)
+      (string-search re:ignore fn))))
+
 (define (parse-egg-directory dir type)
   (with-global-write-lock
    (lambda ()
@@ -257,7 +263,7 @@
                       ;; directories etc. will show up.  Any parse warnings
                       ;; will occur before the name appears.
                       (print name)))
-                  (directory dir)))
+                  (remove ignore-filename? (directory dir))))
 
        ((eggdoc)
         (print "Gathering egg information...")
@@ -381,7 +387,7 @@
         (for-each (lambda (name)
                     (when (parse-individual-man (make-pathname dir name) 'svnwiki)
                       (print name)))
-                  (directory dir))
+                  (remove ignore-filename? (directory dir)))
         (refresh-id-cache))
        (else
         (error "Invalid man directory type" type))))))
