@@ -322,10 +322,6 @@
               '(foreign locations))
              ((string=? t "Other support procedures")
               '(foreign support))
-
-             ((string=? t "Extensions")
-              '(extensions))                      ;; FIXME
-
              ((string=? t "Declarations")
               '(chicken declarations))
              ((string=? t "Parameters")
@@ -334,13 +330,48 @@
               '(chicken macros))
              ((string=? t "Modules and macros")
               '(chicken modules))                  ;; FIXME
-
              ((string=? t "The R5RS standard")
               '(scheme))
 
              ((string=? t "Using the interpreter")
               '(csi))
+             ((string=? t "Using the compiler")
+              '(csc))
+             ;; These are general reading pages which do not
+             ;; contain identifiers.  They're in (chicken)
+             ;; right now even though they don't really reside
+             ;; in that namespace.
+             ((string=? t "Extensions")
+              '(chicken eggs))
+             ((string=? t "Acknowledgements")
+              '(chicken acknowledgements))
+             ((string=? t "Bibliography")
+              '(chicken bibliography))
+             ((string=? t "Bugs and limitations")
+              '(chicken bugs))
+             ((string=? t "C interface")
+              '(chicken c))
+             ((string=? t "Data representation")
+              '(chicken data-representation))
+             ((string=? t "Deviations from the standard")
+              '(chicken standard-deviations))
+             ((string=? t "Extensions to the standard")
+              '(chicken standard-extensions))
+             ((string=? t "Getting started")
+              '(chicken intro))
+             ((string=? t "Non-standard read syntax")
+              '(chicken read-syntax))
+             ((string=? t "faq")
+              '(chicken faq))
+             ;; User's Manual is kind of apropos, though "Supported language"
+             ;; actually resides at toplevel.
+             ((string=? t "The User's Manual")
+              '(chicken))
              (else #f))))))
+
+;; Unscanned:
+;; Basic mode of operation
+;; SKIP Supported language      -- links page
 
 (define (parse-man-directory dir type)
   (with-global-write-lock
