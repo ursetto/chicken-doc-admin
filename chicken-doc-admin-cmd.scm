@@ -15,7 +15,7 @@
       (print "  -e dir         process egg directory DIR")
       (print "  -E file [path] process egg file FILE [and store to node PATH]")
       (print "  -m dir         process manual directory DIR")
-      (print "  -M file        process manual file FILE")
+      (print "  -M file [path] process manual file FILE [and store to node PATH]")
       (print "  -t type        document type (valid with -e -E -m -M)")
       (print "                    types: eggdoc, svnwiki (default: svnwiki)")
       (print "  -r             regenerate indices (required after -E or -M)")
@@ -53,11 +53,15 @@
                  ((string=? o "-E")
                   (unless (pair? r) (usage))
                   (unless (parse-individual-egg (car r) type
-                                                (and (pair? (cdr r)) (cdr r))) ; path override
+                                                ;; path override
+                                                (and (pair? (cdr r)) (cdr r)))
                     (error "Unable to parse egg file" (car r))))
                  ((string=? o "-M")
                   (unless (pair? r) (usage))
-                  (unless (parse-individual-man (car r) type)
+                  (unless (parse-individual-man (car r) type
+                                                (and (pair? (cdr r)) (cdr r)))
+                    ;; Might return #f when path required but not provided
+                    ;; (so message is misleading).
                     (error "Unable to parse man file" (car r))))
                  (else
                   (usage)))))))

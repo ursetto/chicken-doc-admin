@@ -287,12 +287,13 @@
               (make-pathname pathname filename)))))
    (gather-egg-information dir)))
 
-(define (parse-individual-man pathname type)
+(define (parse-individual-man pathname type #!optional (path #f))
   (case type
     ((svnwiki)
      (let ((name (pathname-file pathname)))
-       (let ((path (man-filename->path name)))
-         (and path (regular-file? pathname)
+       (let ((path (or path (man-filename->path name))))
+         (and (regular-file? pathname)
+              path
               (parse-man/svnwiki pathname path name)))))
     (else
      (error "Invalid man document type" type))))
