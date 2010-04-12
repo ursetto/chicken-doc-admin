@@ -63,12 +63,12 @@
 
 ;;; Lowlevel
 
-;; PATH: a list or string key path.  TEXT: String to write to text
+;; PATH: a list or string key path.  SXML: sxml doc to write to 'sxml
 ;; key, or #f to skip.  TYPE: key type (container types are 'unit and 'egg;
 ;; tag types are 'procedure, 'macro, etc.)  SIGNATURE:
 ;; Function signature as string; also used for a short description
 ;; of containers.
-(define (write-key path text type sig)
+(define (write-key path sxml type sig)
   (let* ((keys (path->keys path))
          (pathname (keys->pathname keys)))
     (with-global-write-lock
@@ -77,18 +77,19 @@
        (with-cwd
         pathname
         (lambda ()
-          (with-output-to-file (field-filename 'meta)
-            (lambda ()
-              (for-each (lambda (x)
-                          (write x) (newline))
-                        `((type ,type)
-                          (signature ,sig)
-                          ;; (identifier ,id)
-                          ))))
-          (if text
-              (with-output-to-file (field-filename 'text)
-                (lambda ()
-                  (display text))))))))))
+          (call-with-output-field
+           path 'meta
+           (lambda (p)
+             (for-each (lambda (x)
+                         (write x p) (newline p))
+                       `((type ,type)
+                         (signature ,sig)
+                         ;; (identifier ,id)
+                         ))))
+          (if sxml
+              (call-with-output-field
+               path 'sxml
+               (lambda (p) (write sxml p))))))))))
 
 ;; find-files follows symlinks, doesn't do depth first unless we cons up
 ;; everything, and doesn't include DIR itself; easier to write our own
@@ -129,22 +130,32 @@
 
 ;;; Hilevel parsing (units, eggs)
 
-(define (write-tags tags tag-body path)
-  (for-each (match-lambda ((type sig id)
-                      (if id
-                          (write-key (append path (list id))
-                                     (string-concatenate-reverse
-                                      (intersperse tag-body "\n"))
-                                     type sig)
-;;                        (warning "Skipped writing tag for signature" sig)
-                          )))
-            (reverse tags)))
+(define (write-definitions path defs)
+  (for-each (lambda (def) (write-definition path def))
+            defs))
+(define (write-definition path def)
+  (define (write-definition-key path id def type sig)
+    (write-key (append path (list id))
+               def type sig))
+  (match def
+         (('def ('sig . sigs) . body)
+          (map (lambda (s)
+                 (match s
+                        ((type sig)
+                         (let ((id (signature->identifier sig type)))
+                           (write-definition-key path id def type sig)))))
+               sigs))))
 
 ;; Open output port to the text key, which is passed to the parser
 ;; to write a transformed wiki document.  Semi-dumb.
 (define (open-output-text path)
   (open-output-file
    (keys+field->pathname (path->keys path) 'text)))
+
+(define (call-with-output-field path field proc)
+  (call-with-output-file
+      (keys+field->pathname (path->keys path) field)
+    proc))
 
 (define (write-eggshell path)
   (let ((name (last path)))
@@ -159,26 +170,27 @@
 ;; (define mandir (make-parameter
 ;;                 (make-pathname `(,+wikidir+ "man" "4") #f)))
 
-(define (parse-egg/svnwiki fn path)
+;; FIXME: PATH is expected to be strings, due to requirement in write-eggshell
+(define (parse-egg/svnwiki fn-or-port path)
   (with-global-write-lock
    (lambda ()
      (write-eggshell path)
-     (let ((t (open-output-text path)))
-       (parse-and-write-tags/svnwiki fn (lambda (tags body)
-                                          (write-tags tags body path))
-                                     t)
-       (close-output-port t))))
+     (let ((sxml-doc (parse-svnwiki fn-or-port)))
+       (call-with-output-field path 'sxml
+                               (lambda (out)
+                                 (write sxml-doc out)))
+       (write-definitions path (extract-definitions sxml-doc)))))
   #t)
 
-(define (parse-man/svnwiki fn path name)
+(define (parse-man/svnwiki fn-or-port path name)
   (with-global-write-lock
    (lambda ()
      (write-manshell path name)
-     (let ((t (open-output-text path)))
-       (parse-and-write-tags/svnwiki fn (lambda (tags body)
-                                          (write-tags tags body path))
-                                     t)
-       (close-output-port t))))
+     (let ((sxml-doc (parse-svnwiki fn-or-port)))
+       (call-with-output-field path 'sxml
+                               (lambda (out)
+                                 (write sxml-doc out)))
+       (write-definitions path (extract-definitions sxml-doc)))))
   #t)
 
 (define eggdoc-svnwiki-available?
