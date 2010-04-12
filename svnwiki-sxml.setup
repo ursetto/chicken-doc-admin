@@ -1,0 +1,7 @@
+(compile -s -O2 -d1 svnwiki-sxml.scm -j svnwiki-sxml)
+(compile -s -O2 -d0 svnwiki-sxml.import.scm)
+
+(install-extension
+  'svnwiki-sxml
+  '("svnwiki-sxml.so" "svnwiki-sxml.import.so")
+  '((version 0.1)))
