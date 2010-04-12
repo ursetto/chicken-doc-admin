@@ -74,22 +74,19 @@
     (with-global-write-lock
      (lambda ()
        (create-directory pathname #t) ;; mkdir -p
-       (with-cwd
-        pathname
-        (lambda ()
-          (call-with-output-field
-           path 'meta
-           (lambda (p)
-             (for-each (lambda (x)
-                         (write x p) (newline p))
-                       `((type ,type)
-                         (signature ,sig)
-                         ;; (identifier ,id)
-                         ))))
-          (if sxml
-              (call-with-output-field
-               path 'sxml
-               (lambda (p) (write sxml p))))))))))
+       (call-with-output-field
+        path 'meta
+        (lambda (p)
+          (for-each (lambda (x)
+                      (write x p) (newline p))
+                    `((type ,type)
+                      (signature ,sig)
+                      ;; (identifier ,id)
+                      ))))
+       (if sxml
+           (call-with-output-field
+            path 'sxml
+            (lambda (p) (write sxml p))))))))
 
 ;; find-files follows symlinks, doesn't do depth first unless we cons up
 ;; everything, and doesn't include DIR itself; easier to write our own
