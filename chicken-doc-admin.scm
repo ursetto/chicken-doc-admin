@@ -108,7 +108,12 @@
   (let ((pathname (keys->pathname (path->keys path))))
     (unless (directory? pathname)
       (error 'delete-key "No such path" path))
-    (recursive-delete-directory pathname)))
+    (recursive-delete-directory pathname))
+  (when (null? path)
+    ;; Destroy repository magic so it may be reinitialized
+    (when (file-exists? (id-cache-filename))
+      (delete-file (id-cache-filename)))
+    (delete-file (repository-magic))))
 
 ;;; Repo manipulation
 
@@ -117,7 +122,7 @@
   (when (file-exists? (repository-magic))
     (error "Repository already exists at" (repository-base)))
   (create-directory (repository-base))
-;; (create-directory (repository-root))         ;; Created automatically in write-key
+  (create-directory (repository-root))
   (with-output-to-file (repository-magic)
     (lambda () (pp `((version . ,repository-version))))))
 (define (describe-repository)
