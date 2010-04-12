@@ -42,7 +42,7 @@
 (define (with-global-write-lock thunk)
   (cond ((global-write-lock)
          (thunk))
-        (else    ; FIXME use handle-exceptions
+        (else
          (acquire-global-write-lock!)
          (handle-exceptions exn (begin
                                   (release-global-write-lock!)
@@ -52,7 +52,7 @@
 
 ;;; Util
 
-(define (with-cwd dir thunk)          ;; FIXME: dynamic-wind
+(define (with-cwd dir thunk)
   (let ((old (current-directory)))
     (current-directory dir)
     (handle-exceptions exn (begin (current-directory old)
@@ -119,7 +119,7 @@
   (when (file-exists? (repository-magic))
     (error "Repository already exists at" (repository-base)))
   (create-directory (repository-base))
-;; (create-directory (cdoc-root))         ;; Created automatically in write-key
+;; (create-directory (repository-root))         ;; Created automatically in write-key
   (with-output-to-file (repository-magic)
     (lambda () (pp `((version . ,repository-version))))))
 (define (describe-repository)
