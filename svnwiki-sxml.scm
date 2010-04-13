@@ -1,4 +1,6 @@
-;; todo: handle <examples>, <pre>?, <table>
+;; todo: handle <examples>, <pre>?, <table>, <blockquote>
+;; todo: handle <nowiki>.  nearly 100% of existing <nowiki> tags are used
+;;       solely to allow HTML character entities such as &lt;
 
 (module svnwiki-sxml *
 
