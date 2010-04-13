@@ -1,6 +1,7 @@
 ;; todo: handle <examples>, <pre>?, <table>, <blockquote>
 ;; todo: handle <nowiki>.  nearly 100% of existing <nowiki> tags are used
 ;;       solely to allow HTML character entities such as &lt;
+;;       currently assumes <nowiki> is block tag, but it can be inline
 
 (module svnwiki-sxml *
 
@@ -12,6 +13,7 @@
 (import (only srfi-13 string-trim-right string-trim-both))
 (use regex)
 (use matchable)
+(use html-parser)
 
 (import irregex)
 
@@ -83,6 +85,9 @@
 
 (define sre:nowiki-tag-start '(: "<nowiki>" (submatch (* any))))
 (define re:nowiki-tag-start (irregex sre:nowiki-tag-start))
+(define sre:table-tag-start '(: (submatch "<table" (? #\space) (*? any) #\>)
+                                (submatch (* any))))
+(define re:table-tag-start (irregex sre:table-tag-start))
 (define re:enscript-tag-start (irregex sre:enscript-tag-start))
 (define re:enscript-tag-end (irregex '(: (submatch (* any))
                                          "</enscript>"
@@ -90,6 +95,9 @@
 (define re:nowiki-tag-end (irregex '(: (submatch (* any))
                                        "</nowiki>"
                                        (submatch (* any)))))
+(define re:table-tag-end (irregex '(: (submatch (* any))
+                                      "</table>"
+                                      (submatch (* any)))))
 (define sre:directive '(: "[["
                           (submatch (or "tags" "toc"))
                           ":"
@@ -106,6 +114,7 @@
                 ,sre:horizontal-rule
                 ,sre:enscript-tag-start
                 ,sre:nowiki-tag-start
+                ,sre:table-tag-start
                 ,sre:directive
              )))
 
@@ -166,6 +175,7 @@
           ((horizontal-rule? line) => horizontal-rule)
           ((enscript? line) => enscript)
           ((nowiki? line)   => nowiki)
+          ((table? line)    => table)
           ((directive? line) => directive)
           ;; WARNING: If a line is not matched above but does match re:block,
           ;; then (paragraph) will enter an infinite loop.
@@ -209,6 +219,12 @@
   (match-lambda ((_ ln)
             (discard-line)
             `(nowiki ,(read-verbatim re:nowiki-tag-end ln)))))
+
+(define (table? line) (string-match re:table-tag-start line))
+(define table
+  (match-lambda ((_ tag ln)
+            (discard-line)
+            (cadr (html->sxml (string-append tag (read-verbatim re:table-tag-end ln)))))))
 
 (define (read-verbatim end-re ln)   ; returns string with NL-delimited lines until end-re
   (string-intersperse (read-until-end-tag end-re

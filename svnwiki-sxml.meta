@@ -4,5 +4,6 @@
  (category doc-tools)
  (license "BSD")
  (doc-from-wiki)
- (needs matchable)
+ (needs matchable 
+        html-parser)
  (files "svnwiki-sxml.scm" "svnwiki-sxml.scm"))
