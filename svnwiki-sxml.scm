@@ -222,20 +222,19 @@
 
 
 (define (table? line) (string-match re:table-tag-start line))
-(require-library srfi-1)
-(import (only srfi-1 append-map))
-(define (pre-post-order-text doc proc)  ; poor man's sxml-transforms *text*
-  (cond ((null? doc) doc)
-        ((pair? doc) (list (append-map (lambda (x) (pre-post-order-text x proc))
-                                       doc)))
-        ((string? doc) (proc doc))
-        (else (list doc)))) ; hmm
+(use sxml-transforms)
+(define (pre-post-order-text doc proc)
+  (pre-post-order-splice doc `((*text* . ,(lambda (tag str)
+                                            (proc str)))
+                               (*default* . ,(lambda x x)))))
 (define table
   (match-lambda ((_ tag ln)
             (discard-line)
             (let* ((table-str (string-append tag (read-verbatim re:table-tag-end ln)))
                    (table-sxml (cadr (html->sxml table-str))))
-              (pre-post-order-text table-sxml (lambda (x) (inline x)))))))
+              ;; Transform inline elements in strings.  Fails when open/close pair
+              ;; crosses strings.  Usual failure case is interceding char entity.
+              (pre-post-order-text table-sxml inline)))))
 
 (define (read-verbatim end-re ln)   ; returns string with NL-delimited lines until end-re
   (string-intersperse (read-until-end-tag end-re
@@ -278,6 +277,8 @@
           (else
            (cons (block)
                  (definition-body))))))
+
+;;; lists
 
 (define (item-list depth)
   (let ((line (peek-buffered-line)))
@@ -358,6 +359,8 @@
                                   . ,items)))))
             (else (reverse items))))))
 
+;;; pre
+
 (define (preformatted)
   `(pre ,(slurp-preformatted)))
 (define (slurp-preformatted)
@@ -374,6 +377,8 @@
             (else
              (string-intersperse (reverse lines) "\n"))))))
 
+;;; para
+
 (define (paragraph)
   `(p . ,(inline (slurp-paragraph))))
 (define (slurp-paragraph)
@@ -387,6 +392,8 @@
              (string-intersperse (reverse lines) " "))
             (else (discard-line)
                   (loop (cons (string-trim-both line) lines)))))))
+
+;;; svnwiki->sxml
 
 (define (svnwiki->sxml in)
   (discard-line) ; clear buffer
@@ -404,6 +411,7 @@ section-body :: block* section>*
 
 
 ;;; Felix's wiki2html inline parser modified for sxml output
+
 (require-library srfi-1 data-structures)
 (import (only srfi-1 first second third find))
 (import (only data-structures string-translate*))

@@ -5,5 +5,6 @@
  (license "BSD")
  (doc-from-wiki)
  (needs matchable 
-        html-parser)
+        html-parser
+	sxml-transforms)
  (files "svnwiki-sxml.scm" "svnwiki-sxml.scm"))
