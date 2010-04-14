@@ -220,6 +220,7 @@
             (discard-line)
             `(nowiki ,(read-verbatim re:nowiki-tag-end ln)))))
 
+;;; table handling
 
 (define (table? line) (string-match re:table-tag-start line))
 (use sxml-transforms)
@@ -236,8 +237,13 @@
               ;; crosses strings.  Usual failure case is interceding char entity.
               (pre-post-order-text table-sxml inline)))))
 
-(define (read-verbatim end-re ln)   ; returns string with NL-delimited lines until end-re
+;;; block start tag to end tag reading
+
+;; Returns string with NL-delimited lines until end-re
+;; orphaned start and end tags don't count as separate lines
+(define (read-verbatim end-re ln)
   (string-intersperse (read-until-end-tag end-re
+                                          ;; special handling for orphan start tag
                                           (if (string=? ln "") '() (list ln)))
                       "\n"))
 (define (read-until-end-tag end-re lines)  ; returns list of lines
@@ -245,11 +251,16 @@
     (cond ((eof-object? line)
            (reverse lines))
           ((string-search end-re line)
-           => (match-lambda ((_ pre post)
-                        (reverse (cons pre lines)))))   ; need poke-line to handle 'post'
+           => (match-lambda ((_ pre post)   ; ignore post; would need poke-line to handle it
+                        (reverse 
+                         (if (string=? pre "")  ; special handling for orphan end tag
+                             lines
+                             (cons pre lines))))))
           ;; NOTE: Abort if we hit a new section?
           (else
            (read-until-end-tag end-re (cons line lines))))))
+
+;;; definitions (procedures, etc.)
 
 (define (definition-block)
   `(def (sig . ,(definition-sigs))
