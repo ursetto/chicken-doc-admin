@@ -220,11 +220,22 @@
             (discard-line)
             `(nowiki ,(read-verbatim re:nowiki-tag-end ln)))))
 
+
 (define (table? line) (string-match re:table-tag-start line))
+(require-library srfi-1)
+(import (only srfi-1 append-map))
+(define (pre-post-order-text doc proc)  ; poor man's sxml-transforms *text*
+  (cond ((null? doc) doc)
+        ((pair? doc) (list (append-map (lambda (x) (pre-post-order-text x proc))
+                                       doc)))
+        ((string? doc) (proc doc))
+        (else (list doc)))) ; hmm
 (define table
   (match-lambda ((_ tag ln)
             (discard-line)
-            (cadr (html->sxml (string-append tag (read-verbatim re:table-tag-end ln)))))))
+            (let* ((table-str (string-append tag (read-verbatim re:table-tag-end ln)))
+                   (table-sxml (cadr (html->sxml table-str))))
+              (pre-post-order-text table-sxml (lambda (x) (inline x)))))))
 
 (define (read-verbatim end-re ln)   ; returns string with NL-delimited lines until end-re
   (string-intersperse (read-until-end-tag end-re
