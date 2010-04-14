@@ -137,6 +137,8 @@
     (print "line: " line)
     line))
 (define peek-buffered-line peek-buffered-line/normal)
+(define (poke-line line #!optional (p (current-input-port)))
+  (set! *buffered-line* line))
 (define (discard-line #!optional (p (current-input-port)))
   (set! *buffered-line* #f))
 
@@ -242,23 +244,25 @@
 ;; Returns string with NL-delimited lines until end-re
 ;; orphaned start and end tags don't count as separate lines
 (define (read-verbatim end-re ln)
-  (string-intersperse (read-until-end-tag end-re
-                                          ;; special handling for orphan start tag
-                                          (if (string=? ln "") '() (list ln)))
+  (unless (string=? ln "")    ;; special handling for orphan start tag
+    (poke-line ln))
+  (string-intersperse (read-until-end-tag end-re)
                       "\n"))
-(define (read-until-end-tag end-re lines)  ; returns list of lines
-  (let ((line (read-buffered-line)))
-    (cond ((eof-object? line)
-           (reverse lines))
-          ((string-search end-re line)
-           => (match-lambda ((_ pre post)   ; ignore post; would need poke-line to handle it
-                        (reverse 
-                         (if (string=? pre "")  ; special handling for orphan end tag
-                             lines
-                             (cons pre lines))))))
-          ;; NOTE: Abort if we hit a new section?
-          (else
-           (read-until-end-tag end-re (cons line lines))))))
+(define (read-until-end-tag end-re)  ; returns list of lines
+  (let lp ((lines '()))
+    (let ((line (read-buffered-line)))
+      (cond ((eof-object? line)
+             (reverse lines))
+            ((string-search end-re line)
+             => (match-lambda ((_ pre post)
+                          (poke-line post)
+                          (reverse
+                           (if (string=? pre "") ; special handling for orphan end tag
+                               lines
+                               (cons pre lines))))))
+            ;; NOTE: Abort if we hit a new section?
+            (else
+             (lp (cons line lines)))))))
 
 ;;; definitions (procedures, etc.)
 
