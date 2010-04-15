@@ -143,12 +143,15 @@
                def type sig))
   (match def
          (('def ('sig . sigs) . body)
-          (map (lambda (s)
-                 (match s
-                        ((type sig)
-                         (let ((id (signature->identifier sig type)))
-                           (write-definition-key path id def type sig)))))
-               sigs))))
+          (for-each
+           (lambda (s)
+             (match s
+                    ((type sig)
+                     (let ((id (signature->identifier sig type)))
+                       (if id
+                           ;; Skip non-parseable IDs.  We don't want gigantic keys.
+                           (write-definition-key path id def type sig))))))
+           sigs))))
 
 ;; Open output port to the text key, which is passed to the parser
 ;; to write a transformed wiki document.  Semi-dumb.
