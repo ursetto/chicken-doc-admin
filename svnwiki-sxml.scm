@@ -87,6 +87,8 @@
 (define re:nowiki-tag-start (irregex sre:nowiki-tag-start))
 (define sre:table-tag-start '(: (submatch "<table" (? #\space) (*? any) #\>)
                                 (submatch (* any))))
+(define sre:examples-tag-start '(: "<examples>" (submatch (* any))))
+(define re:examples-tag-start (irregex sre:examples-tag-start))
 (define re:table-tag-start (irregex sre:table-tag-start))
 (define re:enscript-tag-start (irregex sre:enscript-tag-start))
 (define re:enscript-tag-end (irregex '(: (submatch (* any))
@@ -98,6 +100,9 @@
 (define re:table-tag-end (irregex '(: (submatch (* any))
                                       "</table>"
                                       (submatch (* any)))))
+(define re:examples-tag-end (irregex '(: (submatch (* any))
+                                         "</examples>"
+                                         (submatch (* any)))))
 (define sre:directive '(: "[["
                           (submatch (or "tags" "toc"))
                           ":"
@@ -115,6 +120,7 @@
                 ,sre:enscript-tag-start
                 ,sre:nowiki-tag-start
                 ,sre:table-tag-start
+                ,sre:examples-tag-start
                 ,sre:directive
              )))
 
@@ -178,6 +184,7 @@
           ((enscript? line) => enscript)
           ((nowiki? line)   => nowiki)
           ((table? line)    => table)
+          ((examples? line) => examples)
           ((directive? line) => directive)
           ;; WARNING: If a line is not matched above but does match re:block,
           ;; then (paragraph) will enter an infinite loop.
@@ -221,6 +228,16 @@
   (match-lambda ((_ ln)
             (discard-line)
             `(nowiki ,(read-verbatim re:nowiki-tag-end ln)))))
+
+(define (examples? line) (string-match re:examples-tag-start line))
+;; Read <examples> block and pass through verbatim to sxml.
+;; There will be some extraneous NLs.
+(define examples
+  (match-lambda ((_ ln)
+            (discard-line)  ; --actually, we don't have to discard, we can just
+                            ; --allow html->sxml to read the entire thing
+            `(examples . ,(cdr (html->sxml
+                                (read-verbatim re:examples-tag-end ln)))))))
 
 ;;; table handling
 
