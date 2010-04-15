@@ -227,7 +227,8 @@
 (define nowiki
   (match-lambda ((_ ln)
             (discard-line)
-            `(nowiki ,(read-verbatim re:nowiki-tag-end ln)))))
+            ;; Should be interpolated into result, but we can't do that
+            (cdr (html->sxml (read-verbatim re:nowiki-tag-end ln))))))
 
 (define (examples? line) (string-match re:examples-tag-start line))
 ;; Read <examples> block and pass through verbatim to sxml.
