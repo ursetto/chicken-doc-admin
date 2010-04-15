@@ -4,5 +4,7 @@
  (category doc-tools)
  (license "BSD")
  (doc-from-wiki)
- (needs matchable chicken-doc svnwiki-sxml)
+ (needs matchable (chicken-doc 0.3)
+ 	html-parser sxml-transforms   ;svnwiki-sxml
+ )
  (files "chicken-doc-admin.scm" "chicken-doc-admin-cmd.scm" "chicken-doc-parser.scm" "chicken-doc-admin.setup" "chicken-doc-admin.html"))

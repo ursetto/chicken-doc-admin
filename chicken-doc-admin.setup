@@ -1,5 +1,5 @@
-;; Temporarily include svnwiki-sxml module here during development
-;(include "svnwiki-sxml.setup")
+;; include private svnwiki-sxml module
+(include "svnwiki-sxml.setup")
 
 ;;; chicken-doc-admin
 
