@@ -39,13 +39,20 @@
         (else
          (call-with-input-file fn-or-port svnwiki->sxml))))  ;unsafe for exns
 
-(use sxpath)   ; FIXME replace with walker
-
 ;; Return a list of DEF blocks in sxml document DOC.
-(define extract-definitions
-  (let ((defs (sxpath '(// def))))
-    (lambda (doc)
-      (defs doc))))
+(require-library srfi-1)
+(import (only srfi-1 append-map))
+
+(define (extract-definitions doc)
+  (define (gather doc sym)              ;(sxpath '(// sym))
+    (cond ((null? doc) '())
+          ((pair? doc)
+           (if (eq? (car doc) sym)
+               (list doc)
+               (append-map (lambda (x) (gather x sym))
+                           doc)))
+          (else '())))
+  (gather doc 'def))
 
 )
 
