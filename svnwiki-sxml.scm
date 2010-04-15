@@ -454,6 +454,7 @@ section-body :: block* section>*
 (define +bold+ '(: (= 3 #\') (submatch (+ (~ #\'))) (= 3 #\')))
 (define +italic+ '(: (= 2 #\') (submatch (+ (~ #\'))) (= 2 #\')))
 (define +html-tag+ '(: #\< (submatch (+ (~ #\>))) #\>))
+(define +nowiki+ '(: "<nowiki>" (submatch (*? any)) "</nowiki>"))
 
 (define +link+
   '(: #\[ #\[ (submatch (* (~ #\] #\|))) (? #\| (submatch (* (~ #\])))) #\] #\]))
@@ -462,11 +463,17 @@ section-body :: block* section>*
       (submatch (* (~ #\] #\|))) (? #\| (submatch (* (~ #\])))) #\] #\]))
 (define +inline-element+
   `(or ,+code+ ,+image-link+ ,+link+ ;; ,+html-tag+
+       ,+nowiki+
        ,+bold+ ,+italic+))
 (define +http-url+ '(: (* space) "http://" (* any)))
 
 (define *manual-pages* '())
 (define-constant rx irregex)
+
+;; Parse nowiki contents as html; do no
+;; further parsing for inline elements.
+(define (nowiki-inline str)
+  (cdr (html->sxml str)))
 
 (define inline
   (let ((rx:inline-element (rx +inline-element+))
@@ -474,11 +481,10 @@ section-body :: block* section>*
         (rx:html-tag       (rx `(: ,+html-tag+)))
         (rx:image-link     (rx `(: bos ,+image-link+)))
         (rx:link           (rx `(: bos ,+link+)))
-        (rx:tags-directive (rx '(: bos (* space) "tags:"
-                                   (submatch (+ any)))))
         (rx:http-url       (rx +http-url+))
         (rx:bold           (rx `(: bos ,+bold+)))
-        (rx:italic         (rx `(: bos ,+italic+))))
+        (rx:italic         (rx `(: bos ,+italic+)))
+        (rx:nowiki         (rx `(: bos ,+nowiki+))))
     (lambda (str)
       (let ((m (string-search-positions rx:inline-element str)))
         (if (not m)
@@ -521,7 +527,11 @@ section-body :: block* section>*
                            ((string-search rx:italic rest) =>
                             (lambda (m)
                               (cons `(i . ,(inline (second m)))
-                                    (continue m)))) 
+                                    (continue m))))
+                           ((string-search rx:nowiki rest) =>
+                            (lambda (m)
+                              (append (nowiki-inline (second m))
+                                      (continue m))))
                            (else (error "unknown inline match" m rest))))))
               (if (string=? before "")
                   after
