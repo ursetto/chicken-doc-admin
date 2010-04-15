@@ -1,0 +1,10 @@
+((egg "svnwiki-sxml.egg")
+ (synopsis "Parse svnwiki to sxml")
+ (author "Jim Ursetto")
+ (category doc-tools)
+ (license "BSD")
+ (doc-from-wiki)
+ (needs matchable 
+        html-parser
+	sxml-transforms)
+ (files "svnwiki-sxml.scm" "svnwiki-sxml.scm"))
