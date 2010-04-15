@@ -12,6 +12,7 @@
  parse-egg-directory parse-individual-egg
  parse-man-directory parse-individual-man
  create-repository!
+ destroy-repository!
  )
 
 (import scheme chicken)
@@ -108,17 +109,13 @@
   (let ((pathname (keys->pathname (path->keys path))))
     (unless (directory? pathname)
       (error 'delete-key "No such path" path))
-    (recursive-delete-directory pathname))
-  (when (null? path)
-    ;; Destroy repository magic so it may be reinitialized
-    (when (file-exists? (id-cache-filename))
-      (delete-file (id-cache-filename)))
-    (delete-file (repository-magic))))
+    (recursive-delete-directory pathname)))
 
 ;;; Repo manipulation
 
 (define (create-repository!)
   ;; FIXME: initialization should not occur if the version is wrong
+  ;;   -- or, it should destroy the repository first
   (when (file-exists? (repository-magic))
     (error "Repository already exists at" (repository-base)))
   (create-directory (repository-base))
@@ -129,6 +126,11 @@
 ;;   (print "Repository information:")
   (pp (cons `(location . ,(repository-base))
             (repository-information))))
+(define (destroy-repository!)
+  (unless (file-exists? (repository-magic))
+    (error "No repository found at" (repository-base)))
+  (print "Destroying repository at " (repository-base) "...")
+  (recursive-delete-directory (repository-base)))
 
 ;;; Hilevel parsing (units, eggs)
 

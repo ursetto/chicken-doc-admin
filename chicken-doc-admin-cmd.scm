@@ -20,6 +20,7 @@
       (print "                    types: eggdoc, svnwiki (default: svnwiki)")
       (print "  -r             regenerate indices (required after -E or -M)")
       (print "  -d path        delete node PATH recursively (EMPTY PATH DELETES ENTIRE REPO)")
+      (print "  -D             destroy entire repository")      
       (exit 1))))
 
 (let loop ((type 'svnwiki)
@@ -29,6 +30,8 @@
         (r (cdr args)))
     (cond ((string=? o "-i")
            (create-repository!))
+          ((string=? o "-D")
+           (destroy-repository!))
           (else
            (unless (verify-repository)
              (fprintf (current-error-port)
