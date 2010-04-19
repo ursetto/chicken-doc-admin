@@ -4,4 +4,4 @@
 (install-extension
   'svnwiki-sxml
   '("svnwiki-sxml.so" "svnwiki-sxml.import.so")
-  '((version 0.1)))
+  '((version 0.1.1)))

@@ -47,7 +47,7 @@
   (irregex '(: space (submatch (+ any)))))
 (define sre:definition-tag
   `(: #\< (submatch (or ,@+identifier-tags+)) #\>
-               (submatch (+ (~ #\<)))
+               (submatch (: any (*? any)))
                "</" (backref 1) #\>
                (* any)))
 (define sre:horizontal-rule '(: "---" (? #\-)))  ; svnwiki is ---- only
