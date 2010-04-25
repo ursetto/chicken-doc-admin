@@ -43,8 +43,8 @@
                (submatch (+ (~ #\:)))     ; WARNING: submatch 1 may have suffixed whitespace
                (* space) #\: (* space)
                (submatch (* any)))))
-(define re:preformatted
-  (irregex '(: space (submatch (+ any)))))
+(define sre:preformatted '(: space (submatch (* any))))
+(define re:preformatted (irregex sre:preformatted))
 (define sre:definition-tag
   `(: #\< (submatch (or ,@+identifier-tags+)) #\>
                (submatch (: any (*? any)))
@@ -114,7 +114,7 @@
   (irregex `(or (: (>= 2 #\=) (+ space) (+ any))          ; header
                 (: (+ (or #\* #\#)) (+ space) (+ any))    ; item-list
                 (: #\; (+ (~ #\:)) #\: (+ any))           ; definition-list
-                (: space (+ any))                         ; pre
+                ,sre:preformatted
                 ,sre:definition-tag
                 ,sre:horizontal-rule
                 ,sre:enscript-tag-start
