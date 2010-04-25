@@ -307,6 +307,7 @@
            '())
           ((string-match re:definition-tag line)
            '())
+          ((horizontal-rule? line) '())
           (else
            (cons (block)
                  (definition-body))))))
