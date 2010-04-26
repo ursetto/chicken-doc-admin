@@ -351,6 +351,8 @@
               '(chicken declarations))
              ((string=? t "Parameters")
               '(chicken parameters))
+             ((string=? t "Exceptions")
+              '(chicken exceptions))
              ((string=? t "Non-standard macros and special forms")
               '(chicken macros))
              ((string=? t "Modules and macros")
