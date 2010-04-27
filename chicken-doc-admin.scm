@@ -13,6 +13,8 @@
  parse-man-directory parse-individual-man
  create-repository!
  destroy-repository!
+
+ man-filename->path       ; for chickadee
  )
 
 (import scheme chicken)
