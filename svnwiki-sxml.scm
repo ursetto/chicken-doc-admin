@@ -163,9 +163,12 @@
                       (title (caddr m)))
                   (cond ((> next-depth depth)
                          (discard-line)
-                         (let ((sec `(section ,next-depth ,title .
-                                              ,(section-body next-depth))))
-                           (cons sec (section-body depth))))
+                         (let ((title (match (inline title)
+                                             ((t) t)    ; interpolate title when possible
+                                             (t t))))
+                           (let ((sec `(section ,next-depth ,title .
+                                                ,(section-body next-depth))))
+                             (cons sec (section-body depth)))))
                         (else
                          '())))))
           ((string=? line "")
