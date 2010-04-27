@@ -3,7 +3,7 @@
 ;;       solely to allow HTML character entities such as &lt;
 ;;       currently assumes <nowiki> is block tag, but it can be inline
 
-(module svnwiki-sxml *
+(module svnwiki-sxml (svnwiki->sxml)
 
 (import scheme chicken)
 (require-library srfi-13 ports data-structures extras)
@@ -115,7 +115,7 @@
                 (: (+ (or #\* #\#)) (+ space) (+ any))    ; item-list
                 (: #\; (+ (~ #\:)) #\: (+ any))           ; definition-list
                 ,sre:preformatted
-                ,sre:definition-tag
+;;              ,sre:definition-tag                       ; see below [*]
                 ,sre:horizontal-rule
                 ,sre:enscript-tag-start
                 ,sre:nowiki-tag-start
@@ -123,6 +123,11 @@
                 ,sre:examples-tag-start
                 ,sre:directive
              )))
+;; [*] Definition tag relies on backref, but "or" operator throws off
+;; backref numbering indeterminately.  Therefore we disable
+;; definition-tag in re:block; negative effect is that it won't
+;; break us out of current paragraph.  One solution is to make
+;; multiple irregex match calls, one per RE.  Benchmark that.
 
 ;; Single-line readahead (effectively, adds peek-line to read-line)
 (define *buffered-line* #f)
