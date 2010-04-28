@@ -34,9 +34,11 @@
   (when (global-write-lock)
     ;; Not currently recursive.
       (error "Already acquired global write lock"))
-  (let ((out (open-output-file (make-pathname (repository-base) "lock"))))
-    #+(not mingw32) (file-lock/blocking out)
-    (global-write-lock out)))
+  (let ((r (current-repository)))
+    (let ((out (open-output-file (make-pathname (repository-base r)
+                                                "lock"))))
+      #+(not mingw32) (file-lock/blocking out)
+      (global-write-lock out))))
 (define (release-global-write-lock!)
   (unless (global-write-lock)
     (error "Releasing unlocked write lock"))
@@ -118,21 +120,24 @@
 (define (create-repository!)
   ;; FIXME: initialization should not occur if the version is wrong
   ;;   -- or, it should destroy the repository first
-  (when (file-exists? (repository-magic))
-    (error "Repository already exists at" (repository-base)))
-  (create-directory (repository-base))
-  (create-directory (repository-root))
-  (with-output-to-file (repository-magic)
-    (lambda () (pp `((version . ,repository-version))))))
+  (let ((r (current-repository)))
+    (when (file-exists? (repository-magic r))
+      (error "Repository already exists at" (repository-base r)))
+    (create-directory (repository-base r))
+    (create-directory (repository-root r))
+    (with-output-to-file (repository-magic r)
+      (lambda () (pp `((version . ,+repository-version+)))))))
 (define (describe-repository)
 ;;   (print "Repository information:")
-  (pp (cons `(location . ,(repository-base))
-            (repository-information))))
+  (let ((r (current-repository)))
+    (pp (cons `(location . ,(repository-base r))
+              (repository-information r)))))
 (define (destroy-repository!)
-  (unless (file-exists? (repository-magic))
-    (error "No repository found at" (repository-base)))
-  (print "Destroying repository at " (repository-base) "...")
-  (recursive-delete-directory (repository-base)))
+  (let ((r (current-repository)))
+    (unless (file-exists? (repository-magic r))
+      (error "No repository found at" (repository-base r)))
+    (print "Destroying repository at " (repository-base r) "...")
+    (recursive-delete-directory (repository-base r))))
 
 ;;; Hilevel parsing (units, eggs)
 
@@ -425,27 +430,41 @@
 
 ;;; ID search cache (write) -- perhaps should be in chicken-doc proper
 
-(define (write-id-cache!)
-  (let* ((fn (id-cache-filename))
-         (tmp-fn (string-append fn ".tmp")))            ; fixme: mktmp
-    (with-output-to-file tmp-fn
-      (lambda () (write (hash-table->alist (id-cache)))))
-    #+mingw32 (when (file-exists? fn)
-                (delete-file fn)) ;; Lose atomic update on MinGW.
-    (rename-file tmp-fn fn)
-    (id-cache-mtime (current-seconds)
-                    ;; (file-modification-time (id-cache-filename))
-                    )))
 (define (refresh-id-cache)
+  (define (write-id-cache! ht)    ; write HT to current cache and update repo's cache
+    (let* ((r (current-repository))
+           (c (repository-id-cache r)))
+      (set-repository-id-cache!
+       r (write-id-cache c ht))))
+  (define (write-id-cache c ht)   ; disk write table HT to cache C, return new cache obj
+    (let* ((fn (id-cache-filename c))
+           (tmp-fn (string-append fn ".tmp"))) ; fixme: mktmp
+        (with-output-to-file tmp-fn
+          (lambda () (write (hash-table->alist ht))))
+        #+mingw32 (when (file-exists? fn)
+                    (delete-file fn)) ;; Lose atomic update on MinGW.
+        (rename-file tmp-fn fn)
+        (make-id-cache
+            ht
+            (current-seconds)    ;; (file-modification-time (id-cache-filename))
+            (id-cache-filename c))))
+
+  (define (id-cache-table-add! ht pathname)
+    (let ((id (key->id (pathname-file pathname)))
+          ;; We don't save the ID name in the value (since it is in the key)
+          (val (map key->id (butlast (string-split pathname "/\\")))))   ;; hmm
+      (hash-table-update!/default ht id (lambda (old) (cons val old)) '())))
+
   (with-global-write-lock
    (lambda ()
-     (with-cwd (repository-root)
-               (lambda ()
-                 (id-cache (make-hash-table eq?))
-                 (for-each id-cache-add-directory!
-                           (find-files "" directory?))))
-;;      (print "Writing ID cache...")
-     (write-id-cache!))))
+     (let ((r (current-repository)))
+       (with-cwd (repository-root r)
+                 (lambda ()
+                   (let ((ht (make-hash-table eq?)))
+                     (for-each (lambda (pathname)
+                                 (id-cache-table-add! ht pathname))
+                               (find-files "" directory?))
+                     (write-id-cache! ht))))))))
 
 
 )  ;; end module
