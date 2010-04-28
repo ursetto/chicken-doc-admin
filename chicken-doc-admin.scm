@@ -388,8 +388,18 @@
               '(chicken intro))
              ((string=? t "Non-standard read syntax")
               '(chicken read-syntax))
+             ((string=? t "Basic mode of operation")
+              '(chicken basic-operation))
+             ((string=? t "Deployment")
+              '(chicken deployment))
              ((string=? t "faq")
               '(chicken faq))
+             ;; Hack because many internal links to "FAQ" exist.
+             ;; Possibly we should ignore case altogether.
+             ((string=? t "FAQ")
+              '(chicken faq))
+             ((string=? t "Supported language")
+              '(chicken language))
              ;; User's Manual is kind of apropos, though "Supported language"
              ;; actually resides at toplevel.
              ((string=? t "The User's Manual")
