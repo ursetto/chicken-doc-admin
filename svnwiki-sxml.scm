@@ -9,7 +9,8 @@
 (require-library srfi-13 ports data-structures extras)
 (import extras)
 (import (only ports with-input-from-port))
-(import (only data-structures string-intersperse string-split))
+(import (only data-structures string-intersperse string-split
+              string-translate*))
 (import (only srfi-13 string-trim-right string-trim-both
               string-concatenate-reverse))
 (use regex)
@@ -324,6 +325,21 @@
 (define (definition-block)
   `(def (sig . ,(definition-sigs))
         . ,(definition-body)))
+
+(define de-nowikify
+  ;; svnwiki processes HTML tags inside procedure tags.  To insert a
+  ;; literal tag requires <nowiki> + char entity.  Here we convert
+  ;; critical entities to regular text (without fully parsing as HTML).
+  (let ((re (irregex '(: "<nowiki>" (submatch (*? any)) "</nowiki>"))))
+    (define (de-entitize str)
+      (string-translate* str '(("&lt;" . "<")    ("&gt;" . ">")
+                               ("&quot;" . "\"") ("&apos;" . "'")
+                               ("&amp;" . "&"))))
+    (lambda (s)
+      (irregex-replace/all
+       re s
+       (lambda (m) (de-entitize (irregex-match-substring m 1)))))))
+
 (define (definition-sigs)
   (let ((line (peek-buffered-line)))
     (cond ((or (eof-object? line)
@@ -333,9 +349,11 @@
           ((string-match re:definition-tag line)
            => (match-lambda ((_ tag sig)
                         (discard-line)
-                        (cons `(,(string->symbol tag) ,sig)
+                        (cons `(,(string->symbol tag)
+                                ,(de-nowikify sig))   ; gosh i hate svnwiki sometimes
                               (definition-sigs)))))
           (else '()))))
+
 (define (definition-body)
   (let ((line (peek-buffered-line)))
     (cond ((eof-object? line) '())
