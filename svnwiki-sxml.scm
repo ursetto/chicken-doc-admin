@@ -10,7 +10,8 @@
 (import extras)
 (import (only ports with-input-from-port))
 (import (only data-structures string-intersperse string-split))
-(import (only srfi-13 string-trim-right string-trim-both))
+(import (only srfi-13 string-trim-right string-trim-both
+              string-concatenate-reverse))
 (use regex)
 (use matchable)
 (use html-parser)
@@ -256,14 +257,42 @@
   (pre-post-order-splice doc `((*text* . ,(lambda (tag str)
                                             (proc str)))
                                (*default* . ,(lambda x x)))))
+
+(define (concatenate-string-fragments L)
+  ;; Intentional: Does not omit empty strings after collapse.
+  (define (str-concat s) ; requires: s is pair
+    (if (null? (cdr L))
+        s                               ; no fresh copy needed
+        (string-concatenate-reverse s)))
+  (define (scons s L)
+    (if (null? s)
+        L
+        (cons (str-concat s) L)))
+  (let rec ((L L) (str '()))
+    (cond ((null? L)
+           (scons str '()))
+          ((pair? (car L))
+           (scons str
+                  (cons (rec (car L) '())
+                        (rec (cdr L) '()))))
+          ((string? (car L))
+           (rec (cdr L)
+                (cons (car L) str)))
+          (else
+           (scons str
+                  (cons (car L)
+                        (rec (cdr L) '())))))))
+
 (define table
   (match-lambda ((_ tag ln)
             (discard-line)
             (let* ((table-str (string-append tag (read-verbatim re:table-tag-end ln)))
                    (table-sxml (cadr (html->sxml table-str))))
-              ;; Transform inline elements in strings.  Fails when open/close pair
-              ;; crosses strings.  Usual failure case is interceding char entity.
-              (pre-post-order-text table-sxml inline)))))
+              ;; Transform inline elements in strings.  char entities open a
+              ;; new string and transform does not work across string boundaries,
+              ;; so first concatenate any adjacent string fragments in the sxml.
+              (pre-post-order-text (concatenate-string-fragments table-sxml)
+                                   inline)))))
 
 ;;; block start tag to end tag reading
 
