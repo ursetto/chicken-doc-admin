@@ -118,15 +118,16 @@
 ;;; Repo manipulation
 
 (define (create-repository!)
-  ;; FIXME: initialization should not occur if the version is wrong
-  ;;   -- or, it should destroy the repository first
-  (let ((r (current-repository)))
+  (let ((r (make-repository-placeholder
+             (locate-repository))))
     (when (file-exists? (repository-magic r))
       (error "Repository already exists at" (repository-base r)))
+    (print "Creating repository at " (repository-base r) "...")
     (create-directory (repository-base r))
     (create-directory (repository-root r))
     (with-output-to-file (repository-magic r)
-      (lambda () (pp `((version . ,+repository-version+)))))))
+      (lambda () (pp (repository-information r))))))
+
 (define (describe-repository)
 ;;   (print "Repository information:")
   (let ((r (current-repository)))

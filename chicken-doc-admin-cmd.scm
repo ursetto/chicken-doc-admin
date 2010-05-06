@@ -31,9 +31,10 @@
     (cond ((string=? o "-i")
            (create-repository!))
           ((string=? o "-D")
+           (verify-repository)
            (destroy-repository!))
           (else
-           (unless (verify-repository)
+           (unless (verify-repository)        ; WARNING: now throws an error
              (fprintf (current-error-port)
                       "No repository found at ~a\nUse -i to initialize\n" (repository-base))
              (exit 1))
