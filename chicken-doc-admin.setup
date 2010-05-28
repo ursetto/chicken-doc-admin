@@ -11,10 +11,10 @@
 (install-extension
   'chicken-doc-admin
   '("chicken-doc-admin.so" "chicken-doc-admin.import.so" "chicken-doc-parser.import.so")
-  `((version 0.3.5)
+  `((version 0.3.6)
     (documentation "chicken-doc-admin.html")))
 
 (install-program
  'chicken-doc-admin-cmd
  '("chicken-doc-admin")
- `((version 0.3.5)))
+ `((version 0.3.6)))

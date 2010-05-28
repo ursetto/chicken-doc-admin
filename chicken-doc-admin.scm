@@ -361,13 +361,16 @@
               '(chicken parameters))
              ((string=? t "Exceptions")
               '(chicken exceptions))
-             ((string=? t "Non-standard macros and special forms")
+             ((string=? t "Modules and macros")    ;; legacy
+              '(chicken modules))
+             ((string=? t "Modules")
+              '(chicken modules))
+             ((string=? t "Macros")
               '(chicken macros))
-             ((string=? t "Modules and macros")
-              '(chicken modules))                  ;; FIXME
+             ((string=? t "Non-standard macros and special forms")
+              '(chicken special-forms))
              ((string=? t "The R5RS standard")
               '(scheme))
-
              ((string=? t "Using the interpreter")
               '(csi))
              ((string=? t "Using the compiler")
