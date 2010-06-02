@@ -101,17 +101,6 @@
               path 'sxml
               (lambda (p) (display sxml-str p)))))))))
 
-;; RANDOM NOTES
-;; Maybe write sxml key if < 3072 bytes (say).
-;; (sxml #,(deflate "blah")) ;; srfi-10??
-;; (define-reader-ctor 'deflate (lambda (x) (z3:decode-buffer (base64-decode x))))
-;; ... but this isn't really right.  the read value will
-;; be a string, not a "deflate object" and can't be written
-;; back out.  to do this you would need a deflate object.
-;; also what does it expand to?  it will expand to a string
-;; which we must then read from.  i suppose "deflate" or "deflate-obj" could always (read) the string to obtain the actual object, while "deflate-string" would just assume the string was deflated.  after all when data value is in a file, whether compressed or not, you must (read) the value.  and if you don't read (e.g. a ,text node containing a raw string) this is implicitly encoded in your program or in another location that is pointing to the ,text node -- e.g. #,(textfile ",text").  Similarly if a file node is gzip-encoded we must note that somewhere, either in-band (gzip header), in filename (,sxml.gz), in the data pointer (like (gzfile ",text") or #,(gzfile ",text")), or in the code itself which expects gzip-format.
-
-
 ;; find-files follows symlinks, doesn't do depth first unless we cons up
 ;; everything, and doesn't include DIR itself; easier to write our own
 (define (recursive-delete-directory dir)
