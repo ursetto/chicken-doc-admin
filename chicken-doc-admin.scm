@@ -23,6 +23,7 @@
 (use matchable srfi-69 posix regex data-structures files extras srfi-13 srfi-1)
 (import irregex)
 (use setup-download)
+(use ports)
 
 (import chicken-doc-parser)
 
@@ -76,22 +77,40 @@
 (define (write-key path sxml type sig)
   (let* ((keys (path->keys path))
          (pathname (keys->pathname keys)))
-    (with-global-write-lock
-     (lambda ()
-       (create-directory pathname #t) ;; mkdir -p
-       (call-with-output-field
-        path 'meta
-        (lambda (p)
-          (for-each (lambda (x)
-                      (write x p) (newline p))
-                    `((type ,type)
-                      (signature ,sig)
-                      ;; (identifier ,id)
-                      ))))
-       (if sxml
-           (call-with-output-field
-            path 'sxml
-            (lambda (p) (write sxml p))))))))
+    (let* ((sxml-str (and sxml (with-output-to-string
+                                 (lambda () (write sxml)))))
+           (merge-sxml? (and sxml-str
+                             (< (string-length sxml-str) 3072))))
+      (with-global-write-lock
+       (lambda ()
+         (create-directory pathname #t) ;; mkdir -p
+         (call-with-output-field
+          path 'meta
+          (lambda (p)
+            (for-each (lambda (x)
+                        (write x p) (newline p))
+                      `((type ,type)
+                        (signature ,sig)
+                        ,@(if (and sxml-str merge-sxml?)
+                              `((sxml ,sxml))  ; WRITE won't work with sxml-str
+                              '())
+                      
+                        ))))
+         (if (and sxml-str (not merge-sxml?))
+             (call-with-output-field
+              path 'sxml
+              (lambda (p) (display sxml-str p)))))))))
+
+;; RANDOM NOTES
+;; Maybe write sxml key if < 3072 bytes (say).
+;; (sxml #,(deflate "blah")) ;; srfi-10??
+;; (define-reader-ctor 'deflate (lambda (x) (z3:decode-buffer (base64-decode x))))
+;; ... but this isn't really right.  the read value will
+;; be a string, not a "deflate object" and can't be written
+;; back out.  to do this you would need a deflate object.
+;; also what does it expand to?  it will expand to a string
+;; which we must then read from.  i suppose "deflate" or "deflate-obj" could always (read) the string to obtain the actual object, while "deflate-string" would just assume the string was deflated.  after all when data value is in a file, whether compressed or not, you must (read) the value.  and if you don't read (e.g. a ,text node containing a raw string) this is implicitly encoded in your program or in another location that is pointing to the ,text node -- e.g. #,(textfile ",text").  Similarly if a file node is gzip-encoded we must note that somewhere, either in-band (gzip header), in filename (,sxml.gz), in the data pointer (like (gzfile ",text") or #,(gzfile ",text")), or in the code itself which expects gzip-format.
+
 
 ;; find-files follows symlinks, doesn't do depth first unless we cons up
 ;; everything, and doesn't include DIR itself; easier to write our own
