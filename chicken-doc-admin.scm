@@ -268,6 +268,11 @@
 ;; The egg name SHOULD be printed to stdout if it is determined
 ;; programmatically (i.e. if PATH is #f); that is either done here
 ;; or in the individual parser if necessary.
+;; Returns #f if the parse fails (currently, if error or not a regular file).
+;; Returns 'added if the node was new, 'modified if the node existed but was modified,
+;; and 'unchanged if the node was unchanged (based on timestamp comparison).
+;; Note: Timestamp comparison cannot be done for eggdoc nodes as we do not
+;; know the egg node name until after the document is parsed.
 (define (parse-individual-egg pathname type #!optional (path #f))
   (case type
     ((svnwiki)
@@ -276,14 +281,27 @@
                  (path (or path `(,basename)))
                  (fts (file-modification-time pathname)))
             (let* ((node (handle-exceptions e #f (lookup-node path)))  ;; unfortunate API kink
-                   (nts (if node (or (node-timestamp node) 0) 0)))
-              (or (and (<= fts nts)
+                   (nts (if node (or (node-timestamp node) 0) 0))
+                   (ntype (if node (node-type node) 'none)))
+              (or (and (eq? ntype 'egg)
+                       (<= fts nts)
                        'unchanged)
                   (and (parse-egg/svnwiki pathname path fts)
-                       'modified))))))
+                       (if node 'modified 'added)))))))
     ((eggdoc)
      (and (regular-file? pathname)
-          (parse-egg/eggdoc pathname path (file-modification-time pathname))))
+          (let ((fts (file-modification-time pathname)))
+            ;; Force node to #f, leave code scaffolding in place for future timestamp handling
+            (let* ((node #f    ;; (handle-exceptions e #f (lookup-node path))
+                         )
+                   (nts (if node (or (node-timestamp node) 0) 0))
+                   (ntype (if node (node-type node) 'none)))
+              (printf "~a ~a ~a" fts nts ntype)
+              (or (and (eq? ntype 'egg)
+                       (<= fts nts)
+                       'unchanged)
+                  (and (parse-egg/eggdoc pathname path fts)
+                       (if node 'modified 'added)))))))
     (else
      (error "Invalid egg document type" type))))
 
@@ -295,21 +313,23 @@
       (string-search re:ignore fn))))
 
 (define (parse-egg-directory dir type)
-  (let ((egg-count 0) (modified 0))
+  (let ((egg-count 0) (updated 0))
     (with-global-write-lock
      (lambda ()
        (case type
          ((svnwiki)
           (for-each (lambda (name)
-                      ;; Can't count errors yet.  Don't distinguish between non-regular files and errors.
+                      ;; Can't count errors yet as we don't distinguish between non-regular files and errors.
+                      ;; Therefore, don't include error/non-regular files in processed report.
                       (let ((code (parse-individual-egg (make-pathname dir name) type)))
-                        (set! egg-count (+ egg-count 1))
+                        (when code
+                          (set! egg-count (+ egg-count 1)))
                         ;; Must print ONLY after successful parse, otherwise
                         ;; directories etc. will show up.  Any parse warnings
                         ;; will occur before the name appears.
                         (case code
-                          ((modified)
-                           (set! modified (+ modified 1))
+                          ((added modified)
+                           (set! updated (+ updated 1))
                            (print name))
                           ((unchanged)))))
                     (remove ignore-filename? (directory dir))))
@@ -321,13 +341,19 @@
                         (let ((pretty-path
                                (string-substitute re:dir "" pathname)))
                           (display pretty-path) (display " -> ") (flush-output)
-                          (parse-individual-egg pathname type)))
+                          (let ((code (parse-individual-egg pathname type))) ; eggname printed in parse-egg/eggdoc
+                            (when code
+                              (set! egg-count (+ egg-count 1)))
+                            (case code
+                              ((added modified)
+                               (set! updated (+ updated 1)))
+                              ((unchanged))))))
                       (gather-eggdoc-pathnames dir))))
          (else
           (error "Invalid egg directory type" type)))
-       (when (> modified 0)
+       (when (> updated 0)
          (refresh-id-cache))
-       (printf "~a eggs processed, ~a modified\n" egg-count modified)))))
+       (printf "~a eggs processed, ~a updated\n" egg-count updated)))))
 
 ;; Return list of eggdoc pathnames gathered from egg metadata in local
 ;; repository DIR.  Latest tagged version (failing that, trunk) is used.
@@ -351,7 +377,15 @@
        (let ((path (or path (man-filename->path name))))
          (and (regular-file? pathname)
               path
-              (parse-man/svnwiki pathname path name (file-modification-time pathname))))))
+              (let* ((fts (file-modification-time pathname))
+                     (node (handle-exceptions e #f (lookup-node path)))
+                     (nts (if node (or (node-timestamp node) 0) 0))
+                     (ntype (if node (node-type node) 'none)))
+                (or (and (eq? ntype 'unit)   ;; FIXME unit?  what an odd design decision
+                         (<= fts nts)
+                         'unchanged)
+                    (and (parse-man/svnwiki pathname path name fts)
+                         (if node 'modified 'added))))))))
     (else
      (error "Invalid man document type" type))))
 
@@ -440,17 +474,26 @@
              (else #f))))))
 
 (define (parse-man-directory dir type)
-  (with-global-write-lock
-   (lambda ()
-     (case type
-       ((svnwiki)
-        (for-each (lambda (name)
-                    (when (parse-individual-man (make-pathname dir name) 'svnwiki)
-                      (print name)))
-                  (remove ignore-filename? (directory dir)))
-        (refresh-id-cache))
-       (else
-        (error "Invalid man directory type" type))))))
+  (let ((egg-count 0) (updated 0))
+    (with-global-write-lock
+     (lambda ()
+       (case type
+         ((svnwiki)
+          (for-each (lambda (name)
+                      (let ((code (parse-individual-man (make-pathname dir name) 'svnwiki)))
+                        (when code
+                          (set! egg-count (+ egg-count 1)))
+                        (case code
+                          ((added modified)
+                           (set! updated (+ updated 1))
+                           (print name))
+                          ((unchanged)))))
+                    (remove ignore-filename? (directory dir))))
+         (else
+          (error "Invalid man directory type" type)))
+       (when (> updated 0)
+         (refresh-id-cache))
+       (printf "~a man pages processed, ~a updated\n" egg-count updated)))))
 
 ;;; ID search cache (write) -- perhaps should be in chicken-doc proper
 
