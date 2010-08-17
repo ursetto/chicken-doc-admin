@@ -273,7 +273,7 @@
 ;; and 'unchanged if the node was unchanged (based on timestamp comparison).
 ;; Note: Timestamp comparison cannot be done for eggdoc nodes as we do not
 ;; know the egg node name until after the document is parsed.
-(define (parse-individual-egg pathname type #!optional (path #f))
+(define (parse-individual-egg pathname type #!optional path force?)
   (case type
     ((svnwiki)
      (and (regular-file? pathname)
@@ -283,7 +283,8 @@
             (let* ((node (handle-exceptions e #f (lookup-node path)))  ;; unfortunate API kink
                    (nts (if node (or (node-timestamp node) 0) 0))
                    (ntype (if node (node-type node) 'none)))
-              (or (and (eq? ntype 'egg)
+              (or (and (not force?)
+                       (eq? ntype 'egg)
                        (<= fts nts)
                        'unchanged)
                   (and (parse-egg/svnwiki pathname path fts)
@@ -297,7 +298,8 @@
                    (nts (if node (or (node-timestamp node) 0) 0))
                    (ntype (if node (node-type node) 'none)))
               (printf "~a ~a ~a" fts nts ntype)
-              (or (and (eq? ntype 'egg)
+              (or (and (not force?)
+                       (eq? ntype 'egg)
                        (<= fts nts)
                        'unchanged)
                   (and (parse-egg/eggdoc pathname path fts)
@@ -312,7 +314,7 @@
     (lambda (fn)
       (string-search re:ignore fn))))
 
-(define (parse-egg-directory dir type)
+(define (parse-egg-directory dir type #!optional force?)
   (let ((egg-count 0) (updated 0))
     (with-global-write-lock
      (lambda ()
@@ -321,7 +323,7 @@
           (for-each (lambda (name)
                       ;; Can't count errors yet as we don't distinguish between non-regular files and errors.
                       ;; Therefore, don't include error/non-regular files in processed report.
-                      (let ((code (parse-individual-egg (make-pathname dir name) type)))
+                      (let ((code (parse-individual-egg (make-pathname dir name) type #f force?)))
                         (when code
                           (set! egg-count (+ egg-count 1)))
                         ;; Must print ONLY after successful parse, otherwise
@@ -341,7 +343,7 @@
                         (let ((pretty-path
                                (string-substitute re:dir "" pathname)))
                           (display pretty-path) (display " -> ") (flush-output)
-                          (let ((code (parse-individual-egg pathname type))) ; eggname printed in parse-egg/eggdoc
+                          (let ((code (parse-individual-egg pathname type #f force?))) ; eggname printed in parse-egg/eggdoc
                             (when code
                               (set! egg-count (+ egg-count 1)))
                             (case code
@@ -370,7 +372,7 @@
               (make-pathname pathname filename)))))
    (gather-egg-information dir)))
 
-(define (parse-individual-man pathname type #!optional (path #f))
+(define (parse-individual-man pathname type #!optional path force?)
   (case type
     ((svnwiki)
      (let ((name (pathname-file pathname)))
@@ -381,7 +383,8 @@
                      (node (handle-exceptions e #f (lookup-node path)))
                      (nts (if node (or (node-timestamp node) 0) 0))
                      (ntype (if node (node-type node) 'none)))
-                (or (and (eq? ntype 'unit)   ;; FIXME unit?  what an odd design decision
+                (or (and (not force?)
+                         (eq? ntype 'unit)   ;; FIXME unit?  what an odd design decision
                          (<= fts nts)
                          'unchanged)
                     (and (parse-man/svnwiki pathname path name fts)
@@ -473,14 +476,14 @@
               '(chicken))
              (else #f))))))
 
-(define (parse-man-directory dir type)
+(define (parse-man-directory dir type #!optional force?)
   (let ((egg-count 0) (updated 0))
     (with-global-write-lock
      (lambda ()
        (case type
          ((svnwiki)
           (for-each (lambda (name)
-                      (let ((code (parse-individual-man (make-pathname dir name) 'svnwiki)))
+                      (let ((code (parse-individual-man (make-pathname dir name) 'svnwiki #f force?)))
                         (when code
                           (set! egg-count (+ egg-count 1)))
                         (case code
