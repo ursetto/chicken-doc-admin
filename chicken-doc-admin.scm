@@ -153,13 +153,13 @@
 
 ;;; Hilevel parsing (units, eggs)
 
-(define (write-definitions path defs)
-  (for-each (lambda (def) (write-definition path def))
+(define (write-definitions path defs ts)
+  (for-each (lambda (def) (write-definition path def ts))
             defs))
-(define (write-definition path def)
+(define (write-definition path def ts)
   (define (write-definition-key path id def type sig)
     (write-key (append path (list id))
-               def type sig #f))   ;; don't bother timestamping
+               def type sig ts))   ;; don't bother timestamping
   (match def
          (('def ('sig . sigs) . body)
           (for-each
@@ -201,7 +201,7 @@
        (call-with-output-field path 'sxml
                                (lambda (out)
                                  (write sxml-doc out)))
-       (write-definitions path (extract-definitions sxml-doc)))))
+       (write-definitions path (extract-definitions sxml-doc) timestamp))))
   #t)
 
 (define (parse-man/svnwiki fn-or-port path name timestamp)
@@ -212,7 +212,7 @@
        (call-with-output-field path 'sxml
                                (lambda (out)
                                  (write sxml-doc out)))
-       (write-definitions path (extract-definitions sxml-doc)))))
+       (write-definitions path (extract-definitions sxml-doc) timestamp))))
   #t)
 
 (define eggdoc-svnwiki-available?
