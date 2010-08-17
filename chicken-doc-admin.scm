@@ -166,6 +166,7 @@
                      (let ((id (signature->identifier sig type)))
                        (if id
                            ;; Skip non-parseable IDs.  We don't want gigantic keys.
+                           ;; FIXME: For READ (read-syntax) type, maybe we do.
                            (write-definition-key path id def type sig))))))
            sigs))))
 
@@ -187,13 +188,7 @@
 (define (write-manshell path name)
   (write-key path #f 'unit name))
 
-;; (define +wikidir+ "~/scheme/chicken-wiki")
-;; (define eggdir (make-parameter
-;;                 (make-pathname `(,+wikidir+ "eggref" "4") #f)))
-;; (define mandir (make-parameter
-;;                 (make-pathname `(,+wikidir+ "man" "4") #f)))
-
-;; FIXME: PATH is expected to be strings, due to requirement in write-eggshell
+;; FIXME: PATH is expected to be list of strings, due to requirement in write-eggshell
 (define (parse-egg/svnwiki fn-or-port path)
   (with-global-write-lock
    (lambda ()
@@ -283,6 +278,7 @@
 
 (define ignore-filename?
   ;; Ignore not just #*# but #* due to issue with r/w invariance on sharp-syntax
+  ;; in older Chicken.
   (let ((re:ignore (regexp "^#|\\.swp$|~$")))
     (lambda (fn)
       (string-search re:ignore fn))))
@@ -340,7 +336,7 @@
      (error "Invalid man document type" type))))
 
 (define man-filename->path
-  (let ((re:unit (irregex "^Unit (.*)"))
+  (let ((re:unit (irregex "^Unit (.+)"))
         (symbolify-list (lambda (x) (and x (map (lambda (x)
                                              (if (symbol? x) x (string->symbol x)))
                                            x)))))
@@ -422,10 +418,6 @@
              ((string=? t "The User's Manual")
               '(chicken))
              (else #f))))))
-
-;; Unscanned:
-;; Basic mode of operation
-;; SKIP Supported language      -- links page
 
 (define (parse-man-directory dir type)
   (with-global-write-lock
