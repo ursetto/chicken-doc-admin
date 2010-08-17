@@ -277,8 +277,10 @@
                  (fts (file-modification-time pathname)))
             (let* ((node (handle-exceptions e #f (lookup-node path)))  ;; unfortunate API kink
                    (nts (if node (or (node-timestamp node) 0) 0)))
-              (or (<= fts nts)
-                  (parse-egg/svnwiki pathname path fts))))))
+              (or (and (<= fts nts)
+                       'unchanged)
+                  (and (parse-egg/svnwiki pathname path fts)
+                       'modified))))))
     ((eggdoc)
      (and (regular-file? pathname)
           (parse-egg/eggdoc pathname path (file-modification-time pathname))))
@@ -293,30 +295,39 @@
       (string-search re:ignore fn))))
 
 (define (parse-egg-directory dir type)
-  (with-global-write-lock
-   (lambda ()
-     (case type
-       ((svnwiki)
-        (for-each (lambda (name)
-                    (when (parse-individual-egg (make-pathname dir name) type)
-                      ;; Must print ONLY after successful parse, otherwise
-                      ;; directories etc. will show up.  Any parse warnings
-                      ;; will occur before the name appears.
-                      (print name)))
-                  (remove ignore-filename? (directory dir))))
+  (let ((egg-count 0) (modified 0))
+    (with-global-write-lock
+     (lambda ()
+       (case type
+         ((svnwiki)
+          (for-each (lambda (name)
+                      ;; Can't count errors yet.  Don't distinguish between non-regular files and errors.
+                      (let ((code (parse-individual-egg (make-pathname dir name) type)))
+                        (set! egg-count (+ egg-count 1))
+                        ;; Must print ONLY after successful parse, otherwise
+                        ;; directories etc. will show up.  Any parse warnings
+                        ;; will occur before the name appears.
+                        (case code
+                          ((modified)
+                           (set! modified (+ modified 1))
+                           (print name))
+                          ((unchanged)))))
+                    (remove ignore-filename? (directory dir))))
 
-       ((eggdoc)
-        (print "Gathering egg information...")
-        (let ((re:dir (irregex `(: bos ,(make-pathname dir ""))))) ; strip off dir name
-          (for-each (lambda (pathname)
-                      (let ((pretty-path
-                             (string-substitute re:dir "" pathname)))
-                        (display pretty-path) (display " -> ") (flush-output)
-                        (parse-individual-egg pathname type)))
-                    (gather-eggdoc-pathnames dir))))
-       (else
-        (error "Invalid egg directory type" type)))
-     (refresh-id-cache))))
+         ((eggdoc)
+          (print "Gathering egg information...")
+          (let ((re:dir (irregex `(: bos ,(make-pathname dir ""))))) ; strip off dir name
+            (for-each (lambda (pathname)
+                        (let ((pretty-path
+                               (string-substitute re:dir "" pathname)))
+                          (display pretty-path) (display " -> ") (flush-output)
+                          (parse-individual-egg pathname type)))
+                      (gather-eggdoc-pathnames dir))))
+         (else
+          (error "Invalid egg directory type" type)))
+       (when (> modified 0)
+         (refresh-id-cache))
+       (printf "~a eggs processed, ~a modified\n" egg-count modified)))))
 
 ;; Return list of eggdoc pathnames gathered from egg metadata in local
 ;; repository DIR.  Latest tagged version (failing that, trunk) is used.
