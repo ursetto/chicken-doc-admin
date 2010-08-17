@@ -271,11 +271,14 @@
 (define (parse-individual-egg pathname type #!optional (path #f))
   (case type
     ((svnwiki)
-     (let ((basename (pathname-file pathname)))
-       (and (regular-file? pathname)
-            (parse-egg/svnwiki pathname
-                               (or path `(,basename))
-                               (file-modification-time pathname)))))
+     (and (regular-file? pathname)
+          (let* ((basename (pathname-file pathname))
+                 (path (or path `(,basename)))
+                 (fts (file-modification-time pathname)))
+            (let* ((node (handle-exceptions e #f (lookup-node path)))  ;; unfortunate API kink
+                   (nts (if node (or (node-timestamp node) 0) 0)))
+              (or (<= fts nts)
+                  (parse-egg/svnwiki pathname path fts))))))
     ((eggdoc)
      (and (regular-file? pathname)
           (parse-egg/eggdoc pathname path (file-modification-time pathname))))
