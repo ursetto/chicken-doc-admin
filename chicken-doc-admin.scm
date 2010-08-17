@@ -73,8 +73,9 @@
 ;; key, or #f to skip.  TYPE: key type (container types are 'unit and 'egg;
 ;; tag types are 'procedure, 'macro, etc.)  SIGNATURE:
 ;; Function signature as string; also used for a short description
-;; of containers.
-(define (write-key path sxml type sig)
+;; of containers.  TIMESTAMP: Source file update time in seconds since UNIX epoch,
+;; or #f for no timestamp.
+(define (write-key path sxml type sig timestamp)
   (let* ((keys (path->keys path))
          (pathname (keys->pathname keys)))
     (let* ((sxml-str (and sxml (with-output-to-string
@@ -91,10 +92,12 @@
                         (write x p) (newline p))
                       `((type ,type)
                         (signature ,sig)
+                        ,@(if timestamp
+                              `((timestamp ,timestamp))
+                              '())
                         ,@(if (and sxml-str merge-sxml?)
                               `((sxml ,sxml))  ; WRITE won't work with sxml-str
                               '())
-                      
                         ))))
          (if (and sxml-str (not merge-sxml?))
              (call-with-output-field
@@ -156,7 +159,7 @@
 (define (write-definition path def)
   (define (write-definition-key path id def type sig)
     (write-key (append path (list id))
-               def type sig))
+               def type sig #f))   ;; don't bother timestamping
   (match def
          (('def ('sig . sigs) . body)
           (for-each
@@ -181,18 +184,19 @@
       (keys+field->pathname (path->keys path) field)
     proc))
 
-(define (write-eggshell path)
+(define (write-eggshell path timestamp)
   (let ((name (last path)))
     (write-key path #f 'egg
-               (string-append name " egg"))))
-(define (write-manshell path name)
-  (write-key path #f 'unit name))
+               (string-append name " egg")
+               timestamp)))
+(define (write-manshell path name timestamp)
+  (write-key path #f 'unit name timestamp))
 
 ;; FIXME: PATH is expected to be list of strings, due to requirement in write-eggshell
-(define (parse-egg/svnwiki fn-or-port path)
+(define (parse-egg/svnwiki fn-or-port path timestamp)
   (with-global-write-lock
    (lambda ()
-     (write-eggshell path)
+     (write-eggshell path timestamp)
      (let ((sxml-doc (parse-svnwiki fn-or-port)))
        (call-with-output-field path 'sxml
                                (lambda (out)
@@ -200,10 +204,10 @@
        (write-definitions path (extract-definitions sxml-doc)))))
   #t)
 
-(define (parse-man/svnwiki fn-or-port path name)
+(define (parse-man/svnwiki fn-or-port path name timestamp)
   (with-global-write-lock
    (lambda ()
-     (write-manshell path name)
+     (write-manshell path name timestamp)
      (let ((sxml-doc (parse-svnwiki fn-or-port)))
        (call-with-output-field path 'sxml
                                (lambda (out)
@@ -218,7 +222,7 @@
     (lambda ()
       (force avail?))))
 
-(define (parse-egg/eggdoc fn path)
+(define (parse-egg/eggdoc fn path timestamp)
   (unless (eggdoc-svnwiki-available?)
     (##sys#clear-trace-buffer)           ; you are a horrible person
     (error "eggdoc-svnwiki is required but not installed.\nUse `chicken-install eggdoc-svnwiki` to install it."))
@@ -256,7 +260,7 @@
                (print name))
              (let ((path (or path `(,name))))
                (parse-egg/svnwiki (open-input-string text)
-                                  path)))))))
+                                  path timestamp)))))))
 
 ;;; svnwiki egg and man tree parsing
 
@@ -270,9 +274,11 @@
      (let ((basename (pathname-file pathname)))
        (and (regular-file? pathname)
             (parse-egg/svnwiki pathname
-                               (or path `(,basename))))))
+                               (or path `(,basename))
+                               (file-modification-time pathname)))))
     ((eggdoc)
-     (parse-egg/eggdoc pathname path))
+     (and (regular-file? pathname)
+          (parse-egg/eggdoc pathname path (file-modification-time pathname))))
     (else
      (error "Invalid egg document type" type))))
 
@@ -331,7 +337,7 @@
        (let ((path (or path (man-filename->path name))))
          (and (regular-file? pathname)
               path
-              (parse-man/svnwiki pathname path name)))))
+              (parse-man/svnwiki pathname path name (file-modification-time pathname))))))
     (else
      (error "Invalid man document type" type))))
 
