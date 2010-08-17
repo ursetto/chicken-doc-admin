@@ -297,7 +297,6 @@
                          )
                    (nts (if node (or (node-timestamp node) 0) 0))
                    (ntype (if node (node-type node) 'none)))
-              (printf "~a ~a ~a" fts nts ntype)
               (or (and (not force?)
                        (eq? ntype 'egg)
                        (<= fts nts)
