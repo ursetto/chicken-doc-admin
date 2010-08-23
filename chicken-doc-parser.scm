@@ -12,24 +12,28 @@
 ;; Convert signature (usually a list or bare identifier) into an identifier
 ;; At the moment, this just means taking the car of a list if it's a list,
 ;; or otherwise returning the read item.  If it cannot be read as a
-;; scheme expression, fail.
+;; scheme expression, return #f.  As a special case, read syntax returns
+;; the entire signature.
+;; There is no guarantee that the return value is a symbol.
 (define (signature->identifier sig type)
-  (condition-case
-   (let ((L (with-input-from-string sig read)))
-     (cond ((pair? L) (car L))
-           ((symbol? L)
-            ;; SPECIAL HANDLING: handle e.g. MPI:init:: -> MPI:init.
-            ;; Remove this once these signatures are normalized.
-            ;; (Warning: usually read as keywords, if so symbol->string
-            ;;  will strip one : itself)
-            (let ((str (irregex-replace +rx:ivanism+
-                                        (symbol->string L)
-                                        "")))
-              (if str (string->symbol str) L)))
-           (else sig)))
-   ((exn)
-    (warning "Could not parse signature" sig)
-    #f)))
+  (if (eq? type 'read)
+      sig
+      (condition-case
+       (let ((L (with-input-from-string sig read)))
+         (cond ((pair? L) (car L))
+               ((symbol? L)
+                ;; SPECIAL HANDLING: handle e.g. MPI:init:: -> MPI:init.
+                ;; Remove this once these signatures are normalized.
+                ;; (Warning: usually read as keywords, if so symbol->string
+                ;;  will strip one : itself)
+                (let ((str (irregex-replace +rx:ivanism+
+                                            (symbol->string L)
+                                            "")))
+                  (if str (string->symbol str) L)))
+               (else sig)))
+       ((exn)
+        (warning "Could not parse signature" sig)
+        #f))))
 
 ;; Read svnwiki format text file at pathname (or port) FN and
 ;; parse to SXML, returning parsed sxml doc.
