@@ -173,12 +173,6 @@
                            (write-definition-key path id def type sig))))))
            sigs))))
 
-;; Open output port to the text key, which is passed to the parser
-;; to write a transformed wiki document.  Semi-dumb.
-(define (open-output-text path)
-  (open-output-file
-   (keys+field->pathname (path->keys path) 'text)))
-
 (define (call-with-output-field path field proc)
   (call-with-output-file
       (keys+field->pathname (path->keys path) field)
