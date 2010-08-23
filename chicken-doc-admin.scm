@@ -178,34 +178,28 @@
       (keys+field->pathname (path->keys path) field)
     proc))
 
-(define (write-eggshell path timestamp)
+(define (write-eggshell path doc timestamp)
   (let ((name (last path)))
-    (write-key path #f 'egg
+    (write-key path doc 'egg
                (string-append name " egg")
                timestamp)))
-(define (write-manshell path name timestamp)
-  (write-key path #f 'unit name timestamp))
+(define (write-manshell path name doc timestamp)
+  (write-key path doc 'unit name timestamp))
 
 ;; FIXME: PATH is expected to be list of strings, due to requirement in write-eggshell
 (define (parse-egg/svnwiki fn-or-port path timestamp)
   (with-global-write-lock
    (lambda ()
-     (write-eggshell path timestamp)
      (let ((sxml-doc (parse-svnwiki fn-or-port)))
-       (call-with-output-field path 'sxml
-                               (lambda (out)
-                                 (write sxml-doc out)))
+       (write-eggshell path sxml-doc timestamp)
        (write-definitions path (extract-definitions sxml-doc) timestamp))))
   #t)
 
 (define (parse-man/svnwiki fn-or-port path name timestamp)
   (with-global-write-lock
    (lambda ()
-     (write-manshell path name timestamp)
      (let ((sxml-doc (parse-svnwiki fn-or-port)))
-       (call-with-output-field path 'sxml
-                               (lambda (out)
-                                 (write sxml-doc out)))
+       (write-manshell path name sxml-doc timestamp)
        (write-definitions path (extract-definitions sxml-doc) timestamp))))
   #t)
 
@@ -511,6 +505,8 @@
             ht
             (current-seconds)    ;; (file-modification-time (id-cache-filename))
             (id-cache-filename c))))
+  (define (make-id-cache-table)
+    (make-hash-table eq?))
 
   (define (id-cache-table-add! ht pathname)
     (let ((id (key->id (pathname-file pathname)))
@@ -523,7 +519,7 @@
      (let ((r (current-repository)))
        (with-cwd (repository-root r)
                  (lambda ()
-                   (let ((ht (make-hash-table eq?)))
+                   (let ((ht (make-id-cache-table)))
                      (for-each (lambda (pathname)
                                  (id-cache-table-add! ht pathname))
                                (find-files "" directory?))

@@ -13,7 +13,8 @@
 ;; At the moment, this just means taking the car of a list if it's a list,
 ;; or otherwise returning the read item.  If it cannot be read as a
 ;; scheme expression, return #f.  As a special case, read syntax returns
-;; the entire signature.
+;; the entire signature (nb. may cause problem with older Chicken
+;; due to r/w invariance issue with symbols starting with #).
 ;; There is no guarantee that the return value is a symbol.
 (define (signature->identifier sig type)
   (if (eq? type 'read)
