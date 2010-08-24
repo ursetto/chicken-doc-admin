@@ -107,6 +107,8 @@
 ;; find-files follows symlinks, doesn't do depth first unless we cons up
 ;; everything, and doesn't include DIR itself; easier to write our own
 (define (recursive-delete-directory dir)
+;;(define (delete-file fn) (print "deleting file " fn))
+;;(define (delete-directory dir) (print "deleting dir  " dir))
   (for-each
    (lambda (x)
      (let ((fn (make-pathname dir x)))
@@ -119,14 +121,31 @@
    (directory dir #t))
   (delete-directory dir))
 
-;; Warning: delete-key deletes recursively.
-;; FIXME: Deletion of root should retain the root directory (but wipe out the index).
-;;  Recommended to do this quickly via plain recursive-delete-directory rather than traversing children.
+;; delete-key deletes recursively.
+;; Deleting root key deletes via plain recursive-delete-directory and wipes out index,
+;; rather than traversing children.
+
 (define (delete-key path)
-  (let ((pathname (keys->pathname (path->keys path))))
-    (unless (directory? pathname)
-      (error 'delete-key "No such path" path))
-    (recursive-delete-directory pathname)))
+  (with-global-write-lock
+   (lambda ()
+     (cond ((null? path)
+            (let ((root (repository-root (current-repository))))
+              (recursive-delete-directory root)
+              (create-directory root)
+              (empty-working-id-cache!)
+              (commit-working-id-cache!)))
+           (else
+            (init-working-id-cache!)
+            (delete-node (lookup-node path))   ;; Child deletion failure will leave id cache uncommitted.
+            (commit-working-id-cache!))))))
+
+(define (delete-node n)
+  (for-each (lambda (n)
+              (delete-node n))
+            (node-children n))
+  (working-id-cache-delete! (node-path n))
+  (recursive-delete-directory
+   (keys->pathname (path->keys (node-path n)))))
 
 ;;; Repo manipulation
 
@@ -522,6 +541,8 @@
                      (id-cache-table
                       (repository-id-cache
                        (current-repository))))))
+(define (empty-working-id-cache!)
+  (working-id-cache (make-id-cache-table)))
 (define (working-id-cache-add! path)
   (let ((path (map (lambda (x) (if (string? x) (string->symbol x) x))
                    path)))
@@ -567,11 +588,11 @@
     (set-repository-id-cache!
      r (write-id-cache c ht))))
 
+(define (make-id-cache-table)
+  (make-hash-table eq?))
+
 ;; Probably we could convert this to use the working-id-cache.
 (define (refresh-id-cache)
-  (define (make-id-cache-table)
-    (make-hash-table eq?))
-
   (define (id-cache-table-add! ht pathname)
     (let ((id (key->id (pathname-file pathname)))
           ;; We don't save the ID name in the value (since it is in the key)
