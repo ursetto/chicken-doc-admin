@@ -69,7 +69,7 @@
 
 ;;; Lowlevel
 
-;; PATH: a list or string key path.  SXML: sxml doc to write to 'sxml
+;; PATH: a list path of strings or symbols.  SXML: sxml doc to write to 'sxml
 ;; key, or #f to skip.  TYPE: key type (container types are 'unit and 'egg;
 ;; tag types are 'procedure, 'macro, etc.)  SIGNATURE:
 ;; Function signature as string; also used for a short description
@@ -102,7 +102,8 @@
          (if (and sxml-str (not merge-sxml?))
              (call-with-output-field
               path 'sxml
-              (lambda (p) (display sxml-str p)))))))))
+              (lambda (p) (display sxml-str p))))
+         (working-id-cache-add! path))))))
 
 ;; find-files follows symlinks, doesn't do depth first unless we cons up
 ;; everything, and doesn't include DIR itself; easier to write our own
@@ -188,7 +189,7 @@
 
 ;; FIXME: PATH is expected to be list of strings, due to requirement in write-eggshell
 (define (parse-egg/svnwiki fn-or-port path timestamp)
-  (with-global-write-lock
+  (with-global-write-lock           ;; FIXME remove once locked in parse-individual-egg
    (lambda ()
      (let ((sxml-doc (parse-svnwiki fn-or-port)))
        (write-eggshell path sxml-doc timestamp)
@@ -196,7 +197,7 @@
   #t)
 
 (define (parse-man/svnwiki fn-or-port path name timestamp)
-  (with-global-write-lock
+  (with-global-write-lock           ;; FIXME remove once locked in parse-individual-man
    (lambda ()
      (let ((sxml-doc (parse-svnwiki fn-or-port)))
        (write-manshell path name sxml-doc timestamp)
@@ -305,6 +306,7 @@
   (let ((egg-count 0) (updated 0))
     (with-global-write-lock
      (lambda ()
+       (init-working-id-cache!)
        (case type
          ((svnwiki)
           (for-each (lambda (name)
@@ -340,8 +342,7 @@
                       (gather-eggdoc-pathnames dir))))
          (else
           (error "Invalid egg directory type" type)))
-       (when (> updated 0)
-         (refresh-id-cache))
+       (commit-working-id-cache!)
        (printf "~a eggs processed, ~a updated\n" egg-count updated)))))
 
 ;; Return list of eggdoc pathnames gathered from egg metadata in local
@@ -467,6 +468,7 @@
   (let ((egg-count 0) (updated 0))
     (with-global-write-lock
      (lambda ()
+       (init-working-id-cache!)
        (case type
          ((svnwiki)
           (for-each (lambda (name)
@@ -481,30 +483,70 @@
                     (remove ignore-filename? (directory dir))))
          (else
           (error "Invalid man directory type" type)))
-       (when (> updated 0)
-         (refresh-id-cache))
+       (commit-working-id-cache!)
        (printf "~a man pages processed, ~a updated\n" egg-count updated)))))
 
 ;;; ID search cache (write) -- perhaps should be in chicken-doc proper
 
-(define (refresh-id-cache)
-  (define (write-id-cache! ht)    ; write HT to current cache and update repo's cache
-    (let* ((r (current-repository))
-           (c (repository-id-cache r)))
-      (set-repository-id-cache!
-       r (write-id-cache c ht))))
+;; Working ID cache used by WRITE-KEY etc.  The repository cache is
+;; shared and its hash table contents cannot be mutated.
+(define working-id-cache (make-parameter 'uninitalized-working-id-cache))
+
+;; Read ID cache and copy it into working-id-cache.  Ensure you have a global
+;; write lock so that the cache cannot change out from under you.
+(define (init-working-id-cache!)
+  (validate-id-cache! (current-repository))
+  (working-id-cache (hash-table-copy
+                     (id-cache-table
+                      (repository-id-cache
+                       (current-repository))))))
+(define (working-id-cache-add! path)
+  (let ((path (map (lambda (x) (if (string? x) (string->symbol x) x))
+                   path)))
+    (let ((id (last path))
+          (parent (butlast path))
+          (ht (working-id-cache)))
+      (hash-table-update!/default ht id
+                                  (lambda (old)
+                                    (if (member parent old)
+                                        old
+                                        (cons parent old)))
+                                  '()))))
+(define (working-id-cache-delete! path)
+  (let ((path (map (lambda (x) (if (string? x) (string->symbol x) x))
+                   path)))
+    (let ((id (last path))
+          (parent (butlast path))
+          (ht (working-id-cache)))
+      (let ((old (hash-table-ref/default ht id #f)))
+        (if old
+            (if (null? old)
+                (hash-table-delete! ht id)
+                (hash-table-set! ht id
+                                 (remove (lambda (x) (equal? x parent)) old))))))))
+(define (commit-working-id-cache!)
+  (write-id-cache! (working-id-cache)))
+
+(define (write-id-cache! ht)    ; write HT to current cache and update repo's cache
   (define (write-id-cache c ht)   ; disk write table HT to cache C, return new cache obj
     (let* ((fn (id-cache-filename c))
            (tmp-fn (string-append fn ".tmp"))) ; fixme: mktmp
-        (with-output-to-file tmp-fn
-          (lambda () (write (hash-table->alist ht))))
-        #+mingw32 (when (file-exists? fn)
-                    (delete-file fn)) ;; Lose atomic update on MinGW.
-        (rename-file tmp-fn fn)
-        (make-id-cache
-            ht
-            (current-seconds)    ;; (file-modification-time (id-cache-filename))
-            (id-cache-filename c))))
+      (with-output-to-file tmp-fn
+        (lambda () (write (hash-table->alist ht))))
+      #+mingw32 (when (file-exists? fn)
+                  (delete-file fn)) ;; Lose atomic update on MinGW.
+      (rename-file tmp-fn fn)
+      (make-id-cache
+       ht
+       (current-seconds)    ;; (file-modification-time (id-cache-filename))
+       (id-cache-filename c))))
+  (let* ((r (current-repository))
+         (c (repository-id-cache r)))
+    (set-repository-id-cache!
+     r (write-id-cache c ht))))
+
+;; Probably we could convert this to use the working-id-cache.
+(define (refresh-id-cache)
   (define (make-id-cache-table)
     (make-hash-table eq?))
 
