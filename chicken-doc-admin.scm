@@ -563,10 +563,10 @@
           (ht (working-id-cache)))
       (let ((old (hash-table-ref/default ht id #f)))
         (if old
-            (if (null? old)
-                (hash-table-delete! ht id)
-                (hash-table-set! ht id
-                                 (remove (lambda (x) (equal? x parent)) old))))))))
+            (let ((new (remove (lambda (x) (equal? x parent)) old)))
+              (if (null? new)
+                  (hash-table-delete! ht id)
+                  (hash-table-set! ht id new))))))))
 (define (commit-working-id-cache!)
   (write-id-cache! (working-id-cache)))
 
