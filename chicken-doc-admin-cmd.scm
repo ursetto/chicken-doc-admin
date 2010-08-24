@@ -18,7 +18,7 @@
       (print "  -M file [path] process manual file FILE [and store to node PATH]")
       (print "  -t type        document type (valid with -e -E -m -M)")
       (print "                    types: eggdoc, svnwiki (default: svnwiki)")
-      (print "  -r             regenerate indices (required after -E or -M)")
+      (print "  -r             regenerate indices (only if broken)")
       (print "  -f             force processing (ignore timestamp checks)")
       (print "  -d path        delete node PATH recursively (EMPTY PATH DELETES ENTIRE REPO)")
       (print "  -D             destroy entire repository")      

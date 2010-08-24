@@ -120,6 +120,8 @@
   (delete-directory dir))
 
 ;; Warning: delete-key deletes recursively.
+;; FIXME: Deletion of root should retain the root directory (but wipe out the index).
+;;  Recommended to do this quickly via plain recursive-delete-directory rather than traversing children.
 (define (delete-key path)
   (let ((pathname (keys->pathname (path->keys path))))
     (unless (directory? pathname)
