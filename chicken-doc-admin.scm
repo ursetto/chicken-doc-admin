@@ -290,12 +290,18 @@
      (error "Invalid egg document type" type))))
 
 ;; External interface to single egg parsing from command-line.
+;; FIXME: We don't need to read the cache if the egg is unchanged,
+;; but we can't check that until we call parse-one-egg.
 (define (parse-individual-egg pathname type #!optional path force?)
   (with-global-write-lock
    (lambda ()
      (init-working-id-cache!)
-     (parse-one-egg pathname type path force?)
-     (commit-working-id-cache!))))
+     (let ((rc (parse-one-egg pathname type path force?)))
+       (cond ((eq? rc 'unchanged)
+              (print "no changes"))
+             (rc
+              (commit-working-id-cache!)))
+       rc))))
 
 (define ignore-filename?
   ;; Ignore not just #*# but #* due to issue with r/w invariance on sharp-syntax
@@ -386,8 +392,12 @@
   (with-global-write-lock
    (lambda ()
      (init-working-id-cache!)
-     (parse-one-man pathname type path force?)
-     (commit-working-id-cache!))))
+     (let ((rc (parse-one-man pathname type path force?)))
+       (cond ((eq? rc 'unchanged)
+              (print "no changes"))
+             (rc
+              (commit-working-id-cache!)))
+       rc))))
 
 (define man-filename->path
   (let ((re:unit (irregex "^Unit (.+)"))
