@@ -53,8 +53,9 @@
          (handle-exceptions exn (begin
                                   (release-global-write-lock!)
                                   (signal exn))
-           (thunk)
-           (release-global-write-lock!)))))
+           (let ((rc (thunk)))
+             (release-global-write-lock!)
+             rc)))))
 
 ;;; Util
 
