@@ -82,28 +82,26 @@
                                  (lambda () (write sxml)))))
            (merge-sxml? (and sxml-str
                              (< (string-length sxml-str) 3072))))
-      (with-global-write-lock
-       (lambda ()
-         (create-directory pathname #t) ;; mkdir -p
-         (call-with-output-field
-          path 'meta
-          (lambda (p)
-            (for-each (lambda (x)
-                        (write x p) (newline p))
-                      `((type ,type)
-                        (signature ,sig)
-                        ,@(if timestamp
-                              `((timestamp ,timestamp))
-                              '())
-                        ,@(if (and sxml-str merge-sxml?)
-                              `((sxml ,sxml))  ; WRITE won't work with sxml-str
-                              '())
-                        ))))
-         (if (and sxml-str (not merge-sxml?))
-             (call-with-output-field
-              path 'sxml
-              (lambda (p) (display sxml-str p))))
-         (working-id-cache-add! path))))))
+      (create-directory pathname #t) ;; mkdir -p
+      (call-with-output-field
+       path 'meta
+       (lambda (p)
+         (for-each (lambda (x)
+                     (write x p) (newline p))
+                   `((type ,type)
+                     (signature ,sig)
+                     ,@(if timestamp
+                           `((timestamp ,timestamp))
+                           '())
+                     ,@(if (and sxml-str merge-sxml?)
+                           `((sxml ,sxml))  ; WRITE won't work with sxml-str
+                           '())
+                     ))))
+      (if (and sxml-str (not merge-sxml?))
+          (call-with-output-field
+           path 'sxml
+           (lambda (p) (display sxml-str p))))
+      (working-id-cache-add! path))))
 
 ;; find-files follows symlinks, doesn't do depth first unless we cons up
 ;; everything, and doesn't include DIR itself; easier to write our own
@@ -189,20 +187,16 @@
 
 ;; FIXME: PATH is expected to be list of strings, due to requirement in write-eggshell
 (define (parse-egg/svnwiki fn-or-port path timestamp)
-  (with-global-write-lock           ;; FIXME remove once locked in parse-individual-egg
-   (lambda ()
-     (let ((sxml-doc (parse-svnwiki fn-or-port)))
-       (write-eggshell path sxml-doc timestamp)
-       (write-definitions path (extract-definitions sxml-doc) timestamp))))
-  #t)
+  (let ((sxml-doc (parse-svnwiki fn-or-port)))
+    (write-eggshell path sxml-doc timestamp)
+    (write-definitions path (extract-definitions sxml-doc) timestamp)
+    #t))
 
 (define (parse-man/svnwiki fn-or-port path name timestamp)
-  (with-global-write-lock           ;; FIXME remove once locked in parse-individual-man
-   (lambda ()
-     (let ((sxml-doc (parse-svnwiki fn-or-port)))
-       (write-manshell path name sxml-doc timestamp)
-       (write-definitions path (extract-definitions sxml-doc) timestamp))))
-  #t)
+  (let ((sxml-doc (parse-svnwiki fn-or-port)))
+    (write-manshell path name sxml-doc timestamp)
+    (write-definitions path (extract-definitions sxml-doc) timestamp)
+    #t))
 
 (define eggdoc-svnwiki-available?
   (let ((avail? (delay (condition-case
@@ -262,7 +256,7 @@
 ;; and 'unchanged if the node was unchanged (based on timestamp comparison).
 ;; Note: Timestamp comparison cannot be done for eggdoc nodes as we do not
 ;; know the egg node name until after the document is parsed.
-(define (parse-individual-egg pathname type #!optional path force?)
+(define (parse-one-egg pathname type path force?)
   (case type
     ((svnwiki)
      (and (regular-file? pathname)
@@ -295,6 +289,14 @@
     (else
      (error "Invalid egg document type" type))))
 
+;; External interface to single egg parsing from command-line.
+(define (parse-individual-egg pathname type #!optional path force?)
+  (with-global-write-lock
+   (lambda ()
+     (init-working-id-cache!)
+     (parse-one-egg pathname type path force?)
+     (commit-working-id-cache!))))
+
 (define ignore-filename?
   ;; Ignore not just #*# but #* due to issue with r/w invariance on sharp-syntax
   ;; in older Chicken.
@@ -312,7 +314,7 @@
           (for-each (lambda (name)
                       ;; Can't count errors yet as we don't distinguish between non-regular files and errors.
                       ;; Therefore, don't include error/non-regular files in processed report.
-                      (let ((code (parse-individual-egg (make-pathname dir name) type #f force?)))
+                      (let ((code (parse-one-egg (make-pathname dir name) type #f force?)))
                         (when code
                           (set! egg-count (+ egg-count 1)))
                         ;; Must print ONLY after successful parse, otherwise
@@ -332,7 +334,7 @@
                         (let ((pretty-path
                                (string-substitute re:dir "" pathname)))
                           (display pretty-path) (display " -> ") (flush-output)
-                          (let ((code (parse-individual-egg pathname type #f force?))) ; eggname printed in parse-egg/eggdoc
+                          (let ((code (parse-one-egg pathname type #f force?))) ; eggname printed in parse-egg/eggdoc
                             (when code
                               (set! egg-count (+ egg-count 1)))
                             (case code
@@ -360,7 +362,7 @@
               (make-pathname pathname filename)))))
    (gather-egg-information dir)))
 
-(define (parse-individual-man pathname type #!optional path force?)
+(define (parse-one-man pathname type path force?)
   (case type
     ((svnwiki)
      (let ((name (pathname-file pathname)))
@@ -379,6 +381,13 @@
                          (if node 'modified 'added))))))))
     (else
      (error "Invalid man document type" type))))
+
+(define (parse-individual-man pathname type #!optional path force?)
+  (with-global-write-lock
+   (lambda ()
+     (init-working-id-cache!)
+     (parse-one-man pathname type path force?)
+     (commit-working-id-cache!))))
 
 (define man-filename->path
   (let ((re:unit (irregex "^Unit (.+)"))
@@ -472,7 +481,7 @@
        (case type
          ((svnwiki)
           (for-each (lambda (name)
-                      (let ((code (parse-individual-man (make-pathname dir name) 'svnwiki #f force?)))
+                      (let ((code (parse-one-man (make-pathname dir name) 'svnwiki #f force?)))
                         (when code
                           (set! egg-count (+ egg-count 1)))
                         (case code
