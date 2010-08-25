@@ -186,12 +186,13 @@
           (for-each
            (lambda (s)
              (match s
-                    ((type sig)
-                     (let ((id (signature->identifier sig type)))
+                    ((type sig . alist)
+                     (let ((id (cadr (assq 'id alist)))) ;; signature parsed by svnwiki-sxml
                        (if id
                            ;; Skip non-parseable IDs.  We don't want gigantic keys.
                            ;; FIXME: For READ (read-syntax) type, maybe we do.
-                           (write-definition-key path id def type sig))))))
+                           (write-definition-key path id def type sig)
+                           (warning "could not parse signature" sig))))))
            sigs))))
 
 (define (call-with-output-field path field proc)
