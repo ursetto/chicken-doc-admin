@@ -190,7 +190,6 @@
                      (let ((id (cadr (assq 'id alist)))) ;; signature parsed by svnwiki-sxml
                        (if id
                            ;; Skip non-parseable IDs.  We don't want gigantic keys.
-                           ;; FIXME: For READ (read-syntax) type, maybe we do.
                            (write-definition-key path id def type sig)
                            (warning "could not parse signature" sig))))))
            sigs))))
