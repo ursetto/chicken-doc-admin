@@ -76,6 +76,10 @@
 ;; Function signature as string; also used for a short description
 ;; of containers.  TIMESTAMP: Source file update time in seconds since UNIX epoch,
 ;; or #f for no timestamp.
+(define (write-doc-node path sxml type sig timestamp)
+  (write-key path sxml type sig timestamp)
+  (write-definitions path (extract-definitions sxml) timestamp))
+
 (define (write-key path sxml type sig timestamp)
   (let* ((keys (path->keys path))
          (pathname (keys->pathname keys)))
@@ -201,23 +205,21 @@
 
 (define (write-eggshell path doc timestamp)
   (let ((name (last path)))
-    (write-key path doc 'egg
-               (string-append name " egg")
-               timestamp)))
+    (write-doc-node path doc 'egg
+                    (string-append name " egg")
+                    timestamp)))
 (define (write-manshell path name doc timestamp)
-  (write-key path doc 'unit name timestamp))
+  (write-doc-node path doc 'unit name timestamp))
 
 ;; FIXME: PATH is expected to be list of strings, due to requirement in write-eggshell
 (define (parse-egg/svnwiki fn-or-port path timestamp)
   (let ((sxml-doc (parse-svnwiki fn-or-port)))
     (write-eggshell path sxml-doc timestamp)
-    (write-definitions path (extract-definitions sxml-doc) timestamp)
     #t))
 
 (define (parse-man/svnwiki fn-or-port path name timestamp)
   (let ((sxml-doc (parse-svnwiki fn-or-port)))
     (write-manshell path name sxml-doc timestamp)
-    (write-definitions path (extract-definitions sxml-doc) timestamp)
     #t))
 
 (define eggdoc-svnwiki-available?
