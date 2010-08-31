@@ -179,24 +179,36 @@
 ;;; Hilevel parsing (units, eggs)
 
 (define (write-definitions path defs ts)
-  (for-each (lambda (def) (write-definition path def ts))
-            defs))
-(define (write-definition path def ts)
-  (define (write-definition-key path id def type sig)
-    (write-key (append path (list id))
-               def type sig ts))   ;; don't bother timestamping
-  (match def
-         (('def ('sig . sigs) . body)
-          (for-each
-           (lambda (s)
-             (match s
-                    ((type sig . alist)
-                     (let ((id (cadr (assq 'id alist)))) ;; signature parsed by svnwiki-sxml
-                       (if id
-                           ;; Skip non-parseable IDs.  We don't want gigantic keys.
-                           (write-definition-key path id def type sig)
-                           (warning "could not parse signature" sig))))))
-           sigs))))
+  (let next-def ((defs defs) (index '()) (defstrs '()) (offset 0))
+    (cond ((null? defs)
+           (call-with-output-field
+            path 'defs
+            (lambda (p)
+              (write `(index . ,index) p)
+              (newline p)
+              (for-each (lambda (s) (display s p))
+                        (reverse defstrs)))))
+          (else
+           (match (car defs)
+                  (('def ('sig . sigs) . body)
+                   (let next-sig ((sigs sigs)
+                                  (index index)
+                                  (parsed? #f))  ;; #t if at least one sig parsed in this def
+                     (if (null? sigs)
+                         (if parsed?
+                             ;; FIXME: We should strip out the id, it wastes space.
+                             (let ((str (with-output-to-string (lambda () (write (car defs)) (newline)))))
+                               (next-def (cdr defs) index (cons str defstrs)
+                                         (+ offset (string-length str))))
+                             (next-def (cdr defs) index defstrs offset))
+                         (match (car sigs)
+                                ((type sig . alist)
+                                 (let ((id (cadr (assq 'id alist)))) ;; signature parsed by svnwiki-sxml
+                                   (if id
+                                       ;; Skip non-parseable IDs.  We don't want gigantic keys.
+                                       (next-sig (cdr sigs) (cons `(,(->string id) ,offset) index) #t)
+                                       (begin (warning "could not parse signature" sig)
+                                              (next-sig (cdr sigs) index parsed?))))))))))))))
 
 (define (call-with-output-field path field proc)
   (call-with-output-file
