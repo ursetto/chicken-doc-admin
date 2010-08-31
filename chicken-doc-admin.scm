@@ -184,7 +184,11 @@
            (call-with-output-field
             path 'defs
             (lambda (p)
-              (write `(index . ,index) p)
+              (write `(index . ,(reverse index)
+                             ;; ,(sort index (lambda (x y)
+                             ;;                (string< (car x) (car y))))
+                             )
+                     p)
               (newline p)
               (for-each (lambda (s) (display s p))
                         (reverse defstrs)))))
