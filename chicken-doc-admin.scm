@@ -181,17 +181,18 @@
 (define (write-definitions path defs ts)
   (let next-def ((defs defs) (index '()) (defstrs '()) (offset 0))
     (cond ((null? defs)
-           (call-with-output-field
-            path 'defs
-            (lambda (p)
-              (write `(index . ,(reverse index)
-                             ;; ,(sort index (lambda (x y)
-                             ;;                (string< (car x) (car y))))
-                             )
-                     p)
-              (newline p)
-              (for-each (lambda (s) (display s p))
-                        (reverse defstrs)))))
+           (when (pair? index)
+             (call-with-output-field
+              path 'defs
+              (lambda (p)
+                (write `(index . ,(reverse index)
+                               ;; ,(sort index (lambda (x y)
+                               ;;                (string< (car x) (car y))))
+                               )
+                       p)
+                (newline p)
+                (for-each (lambda (s) (display s p))
+                          (reverse defstrs))))))
           (else
            (match (car defs)
                   (('def ('sig . sigs) . body)
