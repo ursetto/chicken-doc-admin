@@ -629,24 +629,21 @@
 (define (make-id-cache-table)
   (make-hash-table eq?))
 
-;; Probably we could convert this to use the working-id-cache.
-(define (refresh-id-cache)
-  (define (id-cache-table-add! ht pathname)
-    (let ((id (key->id (pathname-file pathname)))
-          ;; We don't save the ID name in the value (since it is in the key)
-          (val (map key->id (butlast (string-split pathname "/\\")))))   ;; hmm
-      (hash-table-update!/default ht id (lambda (old) (cons val old)) '())))
-
+(define (refresh-id-cache)   ;; rebuild entire ID cache from scratch
   (with-global-write-lock
    (lambda ()
-     (let ((r (current-repository)))
-       (with-cwd (repository-root r)
-                 (lambda ()
-                   (let ((ht (make-id-cache-table)))
-                     (for-each (lambda (pathname)
-                                 (id-cache-table-add! ht pathname))
-                               (find-files "" directory?))
-                     (write-id-cache! ht))))))))
-
+     (init-working-id-cache!)
+     (let refresh-node ((n (lookup-node '())))
+       (for-each (lambda (c)
+                   (unless (node-definition-id? n (node-id c))   ;; dumb
+                     (refresh-node c)))
+                 (node-children n))
+       (for-each (lambda (defid)
+                   (working-id-cache-add! (append (node-path n)
+                                                  (list defid))))
+                 (node-definition-ids n))
+       (unless (null? (node-path n))   ;; skip adding root node
+         (working-id-cache-add! (node-path n))))
+     (commit-working-id-cache!))))
 
 )  ;; end module
