@@ -208,12 +208,15 @@
                              (next-def (cdr defs) index defstrs offset))
                          (match (car sigs)
                                 ((type sig . alist)
-                                 (let ((id (cadr (assq 'id alist)))) ;; signature parsed by svnwiki-sxml
-                                   (if id
+                                 (cond ((cadr (assq 'id alist))
+                                        => (lambda (id)   ;; signature parsed by svnwiki-sxml
+                                             (working-id-cache-add! (append path (list id)))
+                                             (next-sig (cdr sigs) (cons `(,(->string id) ,offset) index)
+                                                       #t)))
+                                       (else (warning "could not parse signature" sig)
+                                             (next-sig (cdr sigs) index parsed?)))
                                        ;; Skip non-parseable IDs.  We don't want gigantic keys.
-                                       (next-sig (cdr sigs) (cons `(,(->string id) ,offset) index) #t)
-                                       (begin (warning "could not parse signature" sig)
-                                              (next-sig (cdr sigs) index parsed?))))))))))))))
+))))))))))
 
 (define (call-with-output-field path field proc)
   (call-with-output-file
