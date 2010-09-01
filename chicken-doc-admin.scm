@@ -633,7 +633,7 @@
 (define (refresh-id-cache)   ;; rebuild entire ID cache from scratch
   (with-global-write-lock
    (lambda ()
-     (init-working-id-cache!)
+     (empty-working-id-cache!)
      (let refresh-node ((n (lookup-node '())))
        (for-each (lambda (c)
                    (unless (node-definition-id? n (node-id c))   ;; dumb
