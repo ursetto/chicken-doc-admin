@@ -144,10 +144,17 @@
             (commit-working-id-cache!))))))
 
 (define (delete-node n)
-  (for-each (lambda (n)
-              (delete-node n))
+  (for-each (lambda (c)
+              ;; This is silly.  We should just get the list of real container (topic?) nodes
+              ;; and delete them.
+              (unless (node-definition-id? n (node-id c))
+                (delete-node c)))
             (node-children n))
   (working-id-cache-delete! (node-path n))
+  (for-each (lambda (defid)
+              (working-id-cache-delete! (append (node-path n)
+                                                (list defid))))
+            (node-definition-ids n))
   (recursive-delete-directory
    (keys->pathname (path->keys (node-path n)))))
 
