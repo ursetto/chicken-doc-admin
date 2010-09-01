@@ -237,7 +237,8 @@
 (define (call-with-output-field path field proc)
   (call-with-output-file
       (keys+field->pathname (path->keys path) field)
-    proc))
+    proc
+    #:binary))
 
 (define (write-eggshell path doc timestamp)
   (let ((name (last path)))
