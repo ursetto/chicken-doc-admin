@@ -162,19 +162,28 @@
     (create-directory (repository-base r))
     (create-directory (repository-root r))
     (with-output-to-file (repository-magic r)
-      (lambda () (pp (repository-information r))))))
+      (lambda () (pp (repository-information r))))
+    (current-repository r)
+    (write-id-cache! (make-id-cache-table))       ;; Empty index file required for working cache
+    ))
 
 (define (describe-repository)
 ;;   (print "Repository information:")
   (let ((r (current-repository)))
     (pp (cons `(location . ,(repository-base r))
               (repository-information r)))))
+;; Unlike every other procedure, destroy-repository! can destroy old repository versions.
+;; It does NOT use the current-repository; instead it uses the special open-repository*
+;; call which can open old versions (if readable).
 (define (destroy-repository!)
-  (let ((r (current-repository)))
-    (unless (file-exists? (repository-magic r))
-      (error "No repository found at" (repository-base r)))
-    (print "Destroying repository at " (repository-base r) "...")
-    (recursive-delete-directory (repository-base r))))
+  (let ((r (open-repository* (locate-repository))))
+    (let ((version (or (alist-ref 'version (repository-information r)) 0)))
+      (case version
+        ((1 2 3)
+         (print "Destroying version " version " repository at " (repository-base r) "...")
+         (recursive-delete-directory (repository-base r)))
+        (else
+         (error 'destroy-repository! "Unable to destroy repository version" version))))))
 
 ;;; Hilevel parsing (units, eggs)
 

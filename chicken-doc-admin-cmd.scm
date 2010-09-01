@@ -33,7 +33,6 @@
     (cond ((string=? o "-i")
            (create-repository!))
           ((string=? o "-D")
-           (verify-repository)
            (destroy-repository!))
           (else
            (unless (verify-repository)        ; WARNING: now throws an error
