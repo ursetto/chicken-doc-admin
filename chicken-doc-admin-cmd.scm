@@ -1,9 +1,7 @@
-#!/usr/bin/env csi4 -script
-
 (require-library chicken-doc-admin)
 (import chicken-doc-admin)
 (require-library chicken-doc)
-(import (only chicken-doc repository-base verify-repository))
+(import (only chicken-doc verify-repository))
 (use ports)
 
 (define (usage)
@@ -35,10 +33,7 @@
           ((string=? o "-D")
            (destroy-repository!))
           (else
-           (unless (verify-repository)        ; WARNING: now throws an error
-             (fprintf (current-error-port)
-                      "No repository found at ~a\nUse -i to initialize\n" (repository-base))
-             (exit 1))
+           (verify-repository)         ;; throws error on failure
            (cond ((string=? o "-r")
                   (print "Rebuilding ID cache...")
                   (refresh-id-cache))
