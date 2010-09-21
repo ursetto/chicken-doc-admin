@@ -195,6 +195,13 @@
 ;;; Hilevel parsing (units, eggs)
 
 (define (write-definitions path defs ts)
+  (define (delete-definitions n) ;; Delete defs from working cache.  Doesn't delete ,defs
+    (for-each (lambda (defid)
+                (working-id-cache-delete! (append (node-path n)
+                                                  (list defid))))
+              (node-definition-ids n)))
+
+  (delete-definitions (lookup-node path))
   (let next-def ((defs defs) (index '()) (defstrs '()) (offset 0))
     (cond ((null? defs)
            (when (pair? index)
