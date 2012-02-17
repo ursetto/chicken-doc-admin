@@ -523,6 +523,8 @@
               '(chicken bibliography))
              ((string=? t "Bugs and limitations")
               '(chicken bugs))
+             ((string=? t "Cross development")
+              '(chicken cross-development))
              ((string=? t "Data representation")
               '(chicken data-representation))
              ((string=? t "Deviations from the standard")
