@@ -8,4 +8,4 @@
  	html-parser sxml-transforms
         (svnwiki-sxml 0.2.7)
  )
- (files "chicken-doc-admin.scm" "chicken-doc-admin-cmd.scm" "chicken-doc-parser.scm" "chicken-doc-admin.setup" "chicken-doc-admin.html"))
+ (files "chicken-doc-parser.scm" "chicken-doc-admin.scm" "chicken-doc-admin.release-info" "chicken-doc-admin.meta" "chicken-doc-admin-cmd.scm" "chicken-doc-admin.setup"))
