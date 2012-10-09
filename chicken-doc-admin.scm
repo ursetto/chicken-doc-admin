@@ -547,6 +547,8 @@
               '(chicken faq))
              ((string=? t "Supported language")
               '(chicken language))
+             ((string=? t "Types")
+              '(chicken types))
              ;; User's Manual is kind of apropos, though "Supported language"
              ;; actually resides at toplevel.
              ((string=? t "The User's Manual")
