@@ -69,6 +69,6 @@
                     ;; (so message is misleading).
                     (error "Unable to parse man file" (car r))))
                  ((string=? o "-I")
-                  (parse-installed-eggs r type force?))
+                  (exit (if (parse-installed-eggs r type force?) 0 1)))
                  (else
                   (usage)))))))

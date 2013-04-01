@@ -620,10 +620,15 @@
                             ;; Safe to count errors here, as *.wiki should be regular files
                             (set! errors (+ errors 1)))
                         (case code
-                          ((added modified)
+                          ((added)
                            (set! updated (+ updated 1))
-                           (print name))
-                          ((unchanged)))))
+                           (print "A " name))
+                          ((modified)
+                           (set! updated (+ updated 1))
+                           (print "M " name))
+                          ((unchanged))
+                          ((#f)
+                           (print "? " name)))))
                     (if (pair? names)
                         (wiki-doc-filenames names)
                         (glob-wiki-docs))))
@@ -633,7 +638,8 @@
        (printf "~a eggs processed, ~a updated~a\n" egg-count updated
                (if (> errors 0)
                    (sprintf ", ~a errors" errors)
-                   ""))))))
+                   ""))))
+    (= errors 0)))
 
 ;;; ID search cache (write) -- perhaps should be in chicken-doc proper
 
