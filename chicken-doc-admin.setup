@@ -8,9 +8,8 @@
 
 (install-extension
   'chicken-doc-admin
-  '("chicken-doc-admin.so" "chicken-doc-admin.import.so" "chicken-doc-parser.import.so")
-  `((version ,version)
-    (documentation "chicken-doc-admin.html")))
+  '("chicken-doc-admin.so" "chicken-doc-admin.import.so" "chicken-doc-parser.import.so" "chicken-doc-admin.wiki")
+  `((version ,version)))
 
 (install-program
  'chicken-doc-admin-cmd
