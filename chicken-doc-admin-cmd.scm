@@ -14,6 +14,7 @@
       (print "  -E file [path] process egg file FILE [and store to node PATH]")
       (print "  -m dir         process manual directory DIR")
       (print "  -M file [path] process manual file FILE [and store to node PATH]")
+      (print "  -I [egg] ...   process installed EGG(s), or all eggs")
       (print "  -t type        document type (valid with -e -E -m -M)")
       (print "                    types: eggdoc, svnwiki (default: svnwiki)")
       (print "  -r             regenerate indices (only if broken)")
@@ -67,5 +68,7 @@
                     ;; Might return #f when path required but not provided
                     ;; (so message is misleading).
                     (error "Unable to parse man file" (car r))))
+                 ((string=? o "-I")
+                  (parse-installed-eggs r type force?))
                  (else
                   (usage)))))))
