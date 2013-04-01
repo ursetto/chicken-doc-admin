@@ -14,8 +14,11 @@
       (print "  -E file [path] process egg file FILE [and store to node PATH]")
       (print "  -m dir         process manual directory DIR")
       (print "  -M file [path] process manual file FILE [and store to node PATH]")
-      (print "  -I             process docs for all installed eggs")
-      (print "  -I egg ...     process docs for one or more installed eggs")
+      (print "  -H             process docs for all installed eggs on this host")
+      (print "  -H egg ...     process docs for one or more installed eggs on this host")
+      (when (feature? #:cross-chicken)
+        (print "  -T             process docs for all installed eggs on cross-compiler target")
+        (print "  -T egg ...     process docs for one or more installed eggs on cross-compiler target"))
       (print "  -t type        document type (valid with -e -E -m -M)")
       (print "                    types: eggdoc, svnwiki (default: svnwiki)")
       (print "  -r             regenerate indices (only if broken)")
@@ -69,7 +72,10 @@
                     ;; Might return #f when path required but not provided
                     ;; (so message is misleading).
                     (error "Unable to parse man file" (car r))))
-                 ((string=? o "-I")
+                 ((string=? o "-H")
                   (exit (if (parse-installed-eggs r type force?) 0 1)))
+                 ((string=? o "-T")
+                  ;; On non-cross-compilers this is equivalent to -H.
+                  (exit (if (parse-installed-eggs r type force? 'target) 0 1)))
                  (else
                   (usage)))))))

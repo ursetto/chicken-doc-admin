@@ -23,6 +23,7 @@
 (import chicken-doc)
 (use matchable srfi-69 posix regex data-structures files extras srfi-13 srfi-1)
 (import irregex)
+(import foreign)  ;; for parse-installed-eggs
 (use setup-download)
 (use ports)
 
@@ -580,21 +581,18 @@
 
 ;; If names is null, look for all .wiki docs in the repository.  Otherwise,
 ;; if names are explicitly provided, look for matching .wiki docs (and record an error
-;; if not present).
-(define (parse-installed-eggs names type #!optional force?)
+;; if not present).  If target? is #t, look for docs in the target repository -- this
+;; will only matter for cross-compilers; for regular compilers, target repo == host repo.
+(define (parse-installed-eggs names type #!optional force? target?)
   ;; ignored: names
   ;; From chicken-status.scm.  There needs to be an official API for this stuff.
 
-  ;; NOTE: Cross chicken currently just looks for host extensions, not target extensions.
-  ;; Not sure which is best (or combine both?)
-  ;;   (define-foreign-variable C_TARGET_LIB_HOME c-string)
-  ;;   (define-foreign-variable C_BINARY_VERSION int)
-  ;;   (define *cross-chicken* (feature? #:cross-chicken))
-  ;;   (define (repo-path)
-  ;;     (if (and *cross-chicken* (not *host-extensions*))
-  ;;         (make-pathname C_TARGET_LIB_HOME (sprintf "chicken/~a" C_BINARY_VERSION))
-  ;;         (repository-path)))
-  (define repo-path repository-path)
+  (define-foreign-variable C_TARGET_LIB_HOME c-string)
+  (define-foreign-variable C_BINARY_VERSION int)
+  (define (repo-path)
+    (if target?
+        (make-pathname C_TARGET_LIB_HOME (sprintf "chicken/~a" C_BINARY_VERSION))
+        (repository-path)))
   (define (glob-wiki-docs)
     ;; shortcut: just look for *.wiki, instead of *.setup-info -> *.wiki
     (glob (make-pathname (repo-path) "*" "wiki")))
