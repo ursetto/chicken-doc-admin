@@ -1,0 +1,323 @@
+[[tags: egg]]
+== chicken-doc-admin
+
+chicken-doc-admin is a tool for generating and maintaining
+Chicken documentation for the [[chicken-doc]] egg.
+[[toc:]]
+=== Overview
+
+[[chicken-doc-admin]] provides facilities to create and modify a Chicken
+documentation repository for [[chicken-doc]].  It includes a command-line
+tool to convert egg documentation and manual pages from the Chicken
+wiki for use with [[chicken-doc]].  It also provides an API for
+repository manipulation.
+
+The typical mode of using [[chicken-doc-admin]] is to check out a copy of
+the wiki using Subversion, then run the [[chicken-doc-admin]] command
+against the copy's egg and man directories.  Optionally, process
+eggdocs by running [[chicken-doc-admin]] against an egg repository checkout.
+Repeat when either is updated; only changed files will be reexamined.
+
+=== Quick start
+
+The default repository location is in the Chicken install tree and may
+not be writable by your user.  If so, either use {{sudo}} or set an
+alternate writable location with:
+
+ $ export CHICKEN_DOC_REPOSITORY=/path/to/some/writable/directory
+
+Initialize the repository if this is your first time:
+
+ $ chicken-doc-admin -i
+
+Now download and process the wiki documentation:
+
+ $ svn co --username anonymous --password "" \
+      http://code.call-cc.org/svn/chicken-eggs/wiki
+ $ chicken-doc-admin -m wiki/man/4
+ $ chicken-doc-admin -e wiki/eggref/4
+
+==== Optional eggdoc processing
+
+''Almost all users can skip this step'', because there are only a few
+remaining eggs that use eggdoc.
+
+Download the egg repository and process any eggdocs:
+
+* '''Warning''': eggdocs are executable Scheme code, so if you are
+concerned about untrusted code, then skip this step or do not run
+it as root.  This risk is reasonably low because anonymous uploads
+are not allowed.
+
+ $ svn co --username anonymous --password "" \
+      http://code.call-cc.org/svn/chicken-eggs/release/4 eggs
+ $ chicken-doc-admin -t eggdoc -e eggs
+
+=== Upgrading
+
+After an upgrade of the egg, if you get a message informing you that
+the repository version is invalid, you will need to delete and
+recreate your repository.  For example:
+
+ $ chicken-doc-admin -D
+ $ chicken-doc-admin -i
+ $ chicken-doc-admin -m ...
+ $ chicken-doc-admin -e ...
+
+=== Command-line
+
+ $ chicken-doc-admin COMMAND
+
+   -l           list repository information
+
+Print some information about the repository, such as its location
+and version.
+
+   -i           initialize repository non-destructively
+
+Initialize the repository in the current default location or as
+overridden by {{CHICKEN_DOC_REPOSITORY}}.  The directory will be
+created if it does not exist.  This command must be run before any
+documentation can be processed.  You should usually initialize an
+empty directory; initializing a populated directory won't delete
+anything, and may confuse us.
+
+   -t type      document type
+
+Set the source document type, which may be {{eggdoc}} or {{svnwiki}},
+defaulting to {{svnwiki}}.  This option can be used before -e, -E, -m, -M.
+
+To process type {{eggdoc}}, you must install the {{eggdoc-svnwiki}} extension.
+
+   -e dir       process egg directory DIR
+
+Process a copy of egg directory DIR, adding each egg documentation page
+to a node at toplevel and the identifiers contained in the
+page to that node's children.  Egg names are displayed as
+they are processed.
+
+* For '''svnwiki''' document types, directory is typically {{/path/to/wiki/eggref/4}}.  The node name will be that of the file's basename, so file {{eggref/4/9p}} becomes node {{9p}}.
+* For '''eggdoc''' types, directory is typically {{/path/to/checkout/of/egg/repo}}, which is scanned for .meta files containing (eggdoc) attributes.  The node name is taken from the eggdoc's (name) attribute.
+
+The timestamp of the source file is stored in each node, and files which
+have not changed since they were last processed are skipped.  Use {{-f}}
+to disregard these timestamps and force reprocessing.
+
+   -m dir       process svnwiki manual directory DIR
+
+Process a copy of svnwiki Chicken manual directory DIR (usually
+{{/path/to/wiki/man/4}}).  Adds unit documentation to
+nodes at toplevel (Unit posix -> posix) and Chicken core
+documentation to nodes under toplevel node chicken 
+(Parameters -> chicken parameters).
+
+A copy of the manual is usually installed in `(chicken-home)`
+under `doc/manual` -- for example, `/usr/local/share/chicken/doc/manual` --
+and you can use this copy instead of checking it out from SVN.
+
+{{chicken-doc-admin}} internally maps each manual page to a node path,
+based on its filename.
+
+   -E file [path...]     process egg file FILE
+
+Process an individual egg file FILE as in -e.  The resulting node path
+is usually determined from context, but you may set it manually with PATH.
+
+FILE may reside anywhere on disk, not just in a repository checkout.
+
+   -M file [path...]     process svnwiki man file FILE
+
+Process an individual svnwiki manual page FILE as in -m.  The node
+name is determined by an internal map of filenames to node paths.
+Alternatively, you can set it directly with PATH.
+
+   -r           regenerate indices
+
+Regenerate documentation indices; at the moment, this is just one
+index, the node -> path search map.  Indexing is done automatically,
+so there is no need to use this option unless your index is somehow
+broken.
+
+   -f           force processing (ignore timestamp checks)
+
+The timestamp of the source file is stored in each node, and normally
+files which have not changed since they were last processed are
+skipped.  Use {{-f}} to disregard these timestamps and force
+reprocessing.  This option can be used before {{-e}}, {{-m}}, {{-E}} and {{-M}},
+which all consider stored timestamps by default.
+
+   -d path      delete node path recursively
+
+Delete node path PATH and everything under it.  Useful for removing,
+for example, an entire egg from the repository.
+
+'''WARNING''': If you do not provide a path, the root path () is used,
+which will delete the contents of the entire repository and leave
+a clean repository in its place.
+
+   -D           destroy repository
+
+Recursively deletes the repository base directory.  You must use
+{{-i}} to recreate the repository.
+
+=== Repository
+
+The repository layout produced by chicken-doc-admin's automatic egg
+and man parser is detailed in the documentation for the
+[[chicken-doc]] egg.
+
+To recap, documentation for each egg and unit is placed in a toplevel
+node named after that egg or unit, with procedure, macro,
+etc. identifiers for that unit as the node's children.  Chicken core
+man pages not corresponding to a particular unit are placed
+individually under the "chicken" toplevel node; for example,
+[[Non-standard macros and special forms]] resides under the path
+{{(chicken macros)}}.
+
+As with [[chicken-doc]], you can override the repository location
+by setting an environment variable:
+
+ export CHICKEN_DOC_REPOSITORY=/path/to/repository
+
+This is useful for testing and also if the default location, which is
+located in {{(chicken-home)}}, is not writable by you.  You can verify
+the current repository location with {{chicken-doc-admin -l}}.
+
+==== Low-level repository structure
+
+This structure is subject to change.
+
+ |-- .chicken-doc-repo    Repository magic file; contains repository info
+ |-- id.idx               Alist mapping node identifiers to paths
+ |-- lock                 Lock file to prevent write conflicts
+ |-- root/                Documentation root node ()
+     |-- 9p/              Documentation node (9p)
+     |    |- ,meta         (9p) metadata alist (signature "9p egg", type 'egg)
+     |    |- ,sxml         (9p) sxml document
+     |    |- ,defs         (9p) definitions (index ...) (def ...) (def ...)
+     |
+     |-- foreign/         Documentation node (foreign)
+          |- ,meta         (foreign) metadata alist + sxml document
+          |- access/      Documentation node (foreign access)
+             |- ,meta      (foreign access) metadata
+             |- ,sxml      (foreign access) sxml document
+             |- ,defs      (foreign access) definitions,
+                              e.g. for (foreign access foreign-code)
+
+Certain characters are %-escaped in filenames, such as / and period.
+
+When the {{,sxml}} document is under 3KB, it is packed into the {{,meta}} file.
+
+{{,defs}} nodes are virtual nodes containing definition sexprs extracted
+from the parent sxml document at parse time, plus an index.  They cannot
+be created, modified or destroyed except via their containing document,
+but are otherwise accessed as regular nodes.  {{,defs}} nodes first appeared
+in version 0.4.0; prior to that, they were "real" nodes and one directory
+was created per definition.
+
+Each node contains a timestamp corresponding to that of the source file.
+
+=== Proper wiki documentation
+
+''This section is a work in progress.''
+
+==== The short and skinny
+
+* Use svnwiki type tags (procedure, macro) around all identifiers
+  to be documented.  See [[wiki-syntax-chicken|Chicken-specific wiki syntax]].
+* Place related tagged identifiers on consecutive, non-blank lines;
+  the text description below is then used for all of them.  eggdocs
+  must use the proper grouping form, described below.
+* Ensure all identifier signatures can be read with a call to (read).
+  Don't use characters such as {{|}} (pipe).
+* Ensure open and close tags for bold, italic, links, code and
+  identifiers are located on the same line.
+
+==== svnwiki identifier type tags
+
+Each identifier is assigned a type (such as 'procedure, 'macro)
+corresponding to svnwiki tags "procedure", "macro" etc.  It is also
+assigned a signature which is taken verbatim from the svnwiki tag
+content.  Finally, the identifier name also comes from the signature;
+the signature is parsed using {{(read)}}, and the result may be a
+symbol (for example, a constant), or a list --- typically, a procedure
+or macro signature, in which case the first element of the list is
+used.  With rare exception, as when the signature contains an
+illegal character such as {{|}} (pipe), this strategy works well.
+
+If a signature cannot be parsed as above, the definition is discarded.
+As a special exception, read syntax signatures are used verbatim, so
+that you can look up read syntax like {{#u8}}.
+
+The currently recognized svnwiki tags are:
+
+ (define +identifier-tags+
+   (list "procedure" "macro" "read" "parameter"
+         "record" "string" "class" "method" "constant" "setter"))
+
+==== Identifier descriptions
+
+When creating an identifier description, the svnwiki parser takes all text
+from after the occurrence of the identifier tag up until the next
+section marker, or the next identifier tag.  This follows the informal
+standard for Chicken documentation on the wiki, and is a natural
+way to separate descriptions logically.  Some points to note:
+
+* The description stops even if the section marker denotes a nested
+  section.  This works well in general, although there are a few eggs
+  which do contain important identifier info in nested sections.
+  To get this information, you have to read the full documentation,
+  or rearrange the structure.
+* If several identifier signatures occur on consecutive lines, without
+  any blank lines between them, they are considered part of a "group"
+  of identifiers.  The following text description then applies to
+  every identifier in the group.  Again, this corresponds to common
+  practice on the wiki.
+* If you look up one identifier in a group, they will all appear,
+  along with the single text description.
+
+==== Eggdoc notes
+
+Identifier groups in eggdocs use the somewhat verbose form
+
+ (definition
+   (signatures
+    (signature "procedure" "(foo bar)")
+    (signature "procedure" "(baz bat)")
+    (signature "macro"     "(quux phlox)"))
+   (p "This describes foo, baz and quux."))
+
+Separating the definitions like {{(procedure ...) (procedure ...)}} 
+instead defines independent, non-grouped procedures.  Nesting
+{{(procedure ... (procedure ...))}} is illegal.
+
+=== API
+
+To be documented.
+
+=== About this egg
+
+==== Author
+
+Jim Ursetto
+
+==== Version history
+
+; 0.4.2 : Recognize 'Cross development' manpage
+; 0.4.1 : Ensure old definitions are removed from index when updating a node
+; 0.4.0 : Repository version 3; dedicated ,defs nodes (saves 80% or more space)
+; 0.3.12 : Eliminate manual reindexing; pack page ,sxml into ,meta when < 3072 bytes
+; 0.3.11 : Read syntax signatures are used verbatim (requires Chicken 4.4.2 or later)
+; 0.3.9 : process only new or modified nodes; display statistics
+; 0.3.7 : pack definition ,sxml into ,meta when < 3072 bytes; saves 20+MB
+; 0.3.4 : shared repository cache
+; 0.3.0 : store pages as SXML; improve parse; repo version 2
+; 0.2.2 : Improve manpage handling
+; 0.2 : Support eggdoc
+; 0.1.1 : Initial release
+
+==== License
+
+Copyright (c) 2010 Jim Ursetto.  License: 3-clause BSD.
+
+

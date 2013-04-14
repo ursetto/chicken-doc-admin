@@ -11,6 +11,7 @@
  delete-key
  parse-egg-directory parse-individual-egg
  parse-man-directory parse-individual-man
+ parse-installed-eggs
  create-repository!
  destroy-repository!
 
@@ -22,6 +23,7 @@
 (import chicken-doc)
 (use matchable srfi-69 posix regex data-structures files extras srfi-13 srfi-1)
 (import irregex)
+(import foreign)  ;; for parse-installed-eggs
 (use setup-download)
 (use ports)
 
@@ -576,6 +578,66 @@
           (error "Invalid man directory type" type)))
        (commit-working-id-cache!)
        (printf "~a man pages processed, ~a updated\n" egg-count updated)))))
+
+;; If names is null, look for all .wiki docs in the repository.  Otherwise,
+;; if names are explicitly provided, look for matching .wiki docs (and record an error
+;; if not present).  If target? is #t, look for docs in the target repository -- this
+;; will only matter for cross-compilers; for regular compilers, target repo == host repo.
+(define (parse-installed-eggs names type #!optional force? target?)
+  ;; ignored: names
+  ;; From chicken-status.scm.  There needs to be an official API for this stuff.
+
+  (define-foreign-variable C_TARGET_LIB_HOME c-string)
+  (define-foreign-variable C_BINARY_VERSION int)
+  (define (repo-path)
+    (if target?
+        (make-pathname C_TARGET_LIB_HOME (sprintf "chicken/~a" C_BINARY_VERSION))
+        (repository-path)))
+  (define (glob-wiki-docs)
+    ;; shortcut: just look for *.wiki, instead of *.setup-info -> *.wiki
+    (glob (make-pathname (repo-path) "*" "wiki")))
+  (define (wiki-doc-filenames egg-names)
+    (let ((repo (repo-path)))
+      (map (lambda (name)
+             (make-pathname repo name "wiki"))
+           egg-names)))
+
+  (let ((egg-count 0) (updated 0) (errors 0))
+    (with-global-write-lock
+     (lambda ()
+       (init-working-id-cache!)
+       (case type
+         ((svnwiki)
+          (for-each (lambda (fn)
+                      (let ((code (parse-one-egg fn type #f force?))
+                            (name (pathname-file fn)))
+                        ;; If file is missing it is recorded as an error but
+                        ;; its name is not printed.
+                        (if code
+                            (set! egg-count (+ egg-count 1))
+                            ;; Safe to count errors here, as *.wiki should be regular files
+                            (set! errors (+ errors 1)))
+                        (case code
+                          ((added)
+                           (set! updated (+ updated 1))
+                           (print "A " name))
+                          ((modified)
+                           (set! updated (+ updated 1))
+                           (print "M " name))
+                          ((unchanged))
+                          ((#f)
+                           (print "? " name)))))
+                    (if (pair? names)
+                        (wiki-doc-filenames names)
+                        (glob-wiki-docs))))
+         (else
+          (error "Invalid installed doc type" type)))
+       (commit-working-id-cache!)
+       (printf "~a eggs processed, ~a updated~a\n" egg-count updated
+               (if (> errors 0)
+                   (sprintf ", ~a errors" errors)
+                   ""))))
+    (= errors 0)))
 
 ;;; ID search cache (write) -- perhaps should be in chicken-doc proper
 

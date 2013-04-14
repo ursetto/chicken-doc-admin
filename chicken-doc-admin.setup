@@ -1,5 +1,5 @@
 ;;; chicken-doc-admin
-(define version "0.4.3")
+(define version "0.4.4")
 
 (compile -s -O2 -d1 -S chicken-doc-admin.scm -j chicken-doc-admin -j chicken-doc-parser)
 (compile -s -O2 -d0 chicken-doc-admin.import.scm)
@@ -8,9 +8,8 @@
 
 (install-extension
   'chicken-doc-admin
-  '("chicken-doc-admin.so" "chicken-doc-admin.import.so" "chicken-doc-parser.import.so")
-  `((version ,version)
-    (documentation "chicken-doc-admin.html")))
+  '("chicken-doc-admin.so" "chicken-doc-admin.import.so" "chicken-doc-parser.import.so" "chicken-doc-admin.wiki")
+  `((version ,version)))
 
 (install-program
  'chicken-doc-admin-cmd
