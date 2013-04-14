@@ -376,7 +376,7 @@
 (define ignore-filename?
   ;; Ignore not just #*# but #* due to issue with r/w invariance on sharp-syntax
   ;; in older Chicken.
-  (let ((re:ignore (regexp "^#|\\.swp$|~$")))
+  (let ((re:ignore (regexp "^[#.]|\\.swp$|~$")))
     (lambda (fn)
       (string-search re:ignore fn))))
 
