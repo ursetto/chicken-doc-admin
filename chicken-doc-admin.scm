@@ -447,7 +447,10 @@
          (else
           (error "Invalid egg directory type" type)))
        (commit-working-id-cache!)
-       (printf "~a eggs processed, ~a updated\n" egg-count updated)))))
+       (when (pair? root)
+         (printf "~a/ " (string-intersperse root " ")))
+       (printf "~a eggs processed, ~a updated\n"
+               egg-count updated)))))
 
 ;; Return list of eggdoc pathnames gathered from egg metadata in local
 ;; repository DIR.  Latest tagged version (failing that, trunk) is used.
