@@ -394,11 +394,15 @@
 (define ignore-filename?
   ;; Ignore not just #*# but #* due to issue with r/w invariance on sharp-syntax
   ;; in older Chicken.
-  ;; FIXME: Possibly ignore every extension except none and .wiki, in case we encounter images
-  ;; etc. in the wiki.
+  ;; Ignore every extension except none and .wiki, in case we encounter images
+  ;; etc. in the wiki.  Any eggname with a dot in it will thus be rejected.
   (let ((re:ignore (regexp "^[#.]|\\.swp$|~$")))
     (lambda (fn)
-      (string-search re:ignore fn))))
+      (let ((ext (pathname-extension fn)))
+        (or
+         (and ext
+              (not (string=? ext "wiki")))
+         (string-search re:ignore fn))))))
 
 (define (parse-egg-directory dir type root #!optional force?)
   (let ((egg-count 0) (updated 0))
