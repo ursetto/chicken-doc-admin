@@ -318,6 +318,16 @@
 
 ;;; svnwiki egg and man tree parsing
 
+;; Get final egg node path; mainly used because parse-one-egg does not return the final path,
+;; and parse-egg-directory needs the final path to print it correctly.
+(define (get-egg-path pathname root path)
+  (let ((basename (pathname-file pathname)))
+    (append root
+            (or path
+                (if (string=? basename "index")
+                    '()
+                    `(,basename))))))
+
 ;; Argument PATH allows computed path override.  It should be a list of strings.
 ;; The egg name SHOULD be printed to stdout if it is determined
 ;; programmatically (i.e. if PATH is #f); that is either done here
@@ -332,12 +342,7 @@
   (case type
     ((svnwiki)
      (cond ((regular-file? pathname)
-            (let* ((basename (pathname-file pathname))
-                   (path (append root
-                                 (or path
-                                     (if (string=? basename "index")
-                                         '()
-                                         `(,basename)))))
+            (let* ((path (get-egg-path pathname root path))
                    (fts (file-modification-time pathname)))
               (let* ((node (handle-exceptions e #f (lookup-node path))) ;; unfortunate API kink
                      (nts (if node (or (node-timestamp node) 0) 0))
@@ -354,7 +359,7 @@
                       (lambda ()
                         (let* ((basename (pathname-file pathname))
                                ;; Note we don't treat "index" specially here (nor can we)
-                               ;; so we can't move index treatment to a higher level.
+                               ;; so we can't use get-egg-path here.
                                (path (append root
                                              (or path `(,basename)))))
                           (parse-egg-directory (current-directory) type path force?)
@@ -415,7 +420,10 @@
           (for-each (lambda (name)
                       ;; Can't count errors yet as we don't distinguish between non-regular files and errors.
                       ;; Therefore, don't include error/non-regular files in processed report.
-                      (let ((code (parse-one-egg (make-pathname dir name) type root #f force?)))
+                      (let* ((pathname (make-pathname dir name))
+                             ;; (We could move name portion from pathname to path arg.)
+                             (code (parse-one-egg pathname type root #f force?))
+                             (path (get-egg-path pathname root #f)))
                         (when code
                           (set! egg-count (+ egg-count 1)))
                         ;; Must print ONLY after successful parse, otherwise
@@ -424,9 +432,7 @@
                         (case code
                           ((added modified)
                            (set! updated (+ updated 1))
-                           (print
-                            (string-intersperse `(,@root ,name)    ;; "index" shows up as (root index); oh well.
-                                                " ")))
+                           (print (string-intersperse path " ")))  ;; FIXME: root index will print as blank line.
                           ((unchanged))
                           ((directory)) ;; Since this can never be "updated", maybe it shouldn't +1 egg-count
                           )))
