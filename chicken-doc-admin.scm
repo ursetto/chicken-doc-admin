@@ -362,7 +362,7 @@
                                ;; so we can't use get-egg-path here.
                                (path (append root
                                              (or path `(,basename)))))
-                          (parse-egg-directory (current-directory) type path force?)
+                          (parse-eggdir (current-directory) type path force?)
                           'directory)
                         )))
            (else #f)))
@@ -410,63 +410,71 @@
               (not (string=? ext "wiki")))
          (string-search re:ignore fn))))))
 
-(define (parse-egg-directory dir type root #!optional force?)
+;; Internal interface.
+(define (parse-eggdir dir type root #!optional force?)
   (let ((egg-count 0) (updated 0))
-    (with-global-write-lock
-     (lambda ()
-       (init-working-id-cache!)
-       (case type
-         ((svnwiki)
-          (for-each (lambda (name)
-                      ;; Can't count errors yet as we don't distinguish between non-regular files and errors.
-                      ;; Therefore, don't include error/non-regular files in processed report.
-                      (let* ((pathname (make-pathname dir name))
-                             ;; (We could move name portion from pathname to path arg.)
-                             (code (parse-one-egg pathname type root #f force?))
-                             (path (get-egg-path pathname root #f)))
-                        (when code
-                          (set! egg-count (+ egg-count 1)))
-                        ;; Must print ONLY after successful parse, otherwise
-                        ;; directories etc. will show up.  Any parse warnings
-                        ;; will occur before the name appears.
-                        (let ((spath (string-intersperse path " ")))
-                          (case code
-                            ((added)
-                             (set! updated (+ updated 1))
-                             (print "A " spath))
-                            ((modified)
-                             (set! updated (+ updated 1))
-                             (print "M " spath))
-                            ((unchanged))
-                            ((directory)) ;; Since this can never be "updated", maybe it shouldn't +1 egg-count
-                            ((#f)
-                             (print "? " spath))))))
-                    (remove ignore-filename? (directory dir))))
+    (case type
+      ((svnwiki)
+       (for-each (lambda (name)
+                   ;; Can't count errors yet as we don't distinguish between non-regular files and errors.
+                   ;; Therefore, don't include error/non-regular files in processed report.
+                   (let* ((pathname (make-pathname dir name))
+                          ;; (We could move name portion from pathname to path arg.)
+                          (code (parse-one-egg pathname type root #f force?))
+                          (path (get-egg-path pathname root #f)))
+                     (when code
+                       (set! egg-count (+ egg-count 1)))
+                     ;; Must print ONLY after successful parse, otherwise
+                     ;; directories etc. will show up.  Any parse warnings
+                     ;; will occur before the name appears.
+                     (let ((spath (string-intersperse path " ")))
+                       (case code
+                         ((added)
+                          (set! updated (+ updated 1))
+                          (print "A " spath))
+                         ((modified)
+                          (set! updated (+ updated 1))
+                          (print "M " spath))
+                         ((unchanged))
+                         ((directory)) ;; Since this can never be "updated", maybe it shouldn't +1 egg-count
+                         ((#f)
+                          (print "? " spath))))))
+                 (remove ignore-filename? (directory dir))))
 
-         ((eggdoc)
-          (print "Gathering egg information...")
-          (let ((re:dir (irregex `(: bos ,(make-pathname dir ""))))) ; strip off dir name
-            (for-each (lambda (pathname)
-                        (let ((pretty-path
-                               (string-substitute re:dir "" pathname)))
-                          (display pretty-path) (display " -> ") (flush-output)
-                          (let ((code (parse-one-egg pathname type root #f force?))) ; eggname printed in parse-egg/eggdoc
-                            (when code
-                              (set! egg-count (+ egg-count 1)))
-                            (case code
-                              ((added modified)
-                               (set! updated (+ updated 1)))
-                              ((unchanged))))))
-                      (gather-eggdoc-pathnames dir))))
-         (else
-          (error "Invalid egg directory type" type)))
-       (commit-working-id-cache!)
+      ((eggdoc)
+       (print "Gathering egg information...")
+       (let ((re:dir (irregex `(: bos ,(make-pathname dir ""))))) ; strip off dir name
+         (for-each (lambda (pathname)
+                     (let ((pretty-path
+                            (string-substitute re:dir "" pathname)))
+                       (display pretty-path) (display " -> ") (flush-output)
+                       (let ((code (parse-one-egg pathname type root #f force?))) ; eggname printed in parse-egg/eggdoc
+                         (when code
+                           (set! egg-count (+ egg-count 1)))
+                         (case code
+                           ((added modified)
+                            (set! updated (+ updated 1)))
+                           ((unchanged))))))
+                   (gather-eggdoc-pathnames dir))))
+      (else
+       (error "Invalid egg directory type" type)))
 
-       (display "; ")
-       (when (pair? root)
-         (printf "~a :: " (string-intersperse root " ")))
-       (printf "~a eggs processed, ~a updated\n"
-               egg-count updated)))))
+    ;; We should move this up a level, to allow 1) skip cache commit if all unchanged,
+    ;; 2) gathering of all egg totals including subdirs.
+    
+    (display "; ")
+    (when (pair? root)
+      (printf "~a :: " (string-intersperse root " ")))
+    (printf "~a eggs processed, ~a updated\n"
+            egg-count updated)))
+
+;; Public (toplevel) command interface.
+(define (parse-egg-directory dir type root #!optional force?)
+  (with-global-write-lock
+   (lambda ()
+     (init-working-id-cache!)
+     (parse-eggdir dir type root force?)
+     (commit-working-id-cache!))))
 
 ;; Return list of eggdoc pathnames gathered from egg metadata in local
 ;; repository DIR.  Latest tagged version (failing that, trunk) is used.
