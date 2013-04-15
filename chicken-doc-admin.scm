@@ -357,7 +357,8 @@
                                ;; so we can't move index treatment to a higher level.
                                (path (append root
                                              (or path `(,basename)))))
-                          (parse-egg-directory (current-directory) type path force?))
+                          (parse-egg-directory (current-directory) type path force?)
+                          'directory)
                         )))
            (else #f)))
     ((eggdoc)
@@ -426,7 +427,9 @@
                            (print
                             (string-intersperse `(,@root ,name)    ;; "index" shows up as (root index); oh well.
                                                 " ")))
-                          ((unchanged)))))
+                          ((unchanged))
+                          ((directory)) ;; Since this can never be "updated", maybe it shouldn't +1 egg-count
+                          )))
                     (remove ignore-filename? (directory dir))))
 
          ((eggdoc)
