@@ -326,12 +326,13 @@
 ;; and 'unchanged if the node was unchanged (based on timestamp comparison).
 ;; Note: Timestamp comparison cannot be done for eggdoc nodes as we do not
 ;; know the egg node name until after the document is parsed.
-(define (parse-one-egg pathname type path force?)
+(define (parse-one-egg pathname type root path force?)
   (case type
     ((svnwiki)
      (and (regular-file? pathname)
           (let* ((basename (pathname-file pathname))
-                 (path (or path `(,basename)))
+                 (path (append root
+                               (or path `(,basename))))
                  (fts (file-modification-time pathname)))
             (let* ((node (handle-exceptions e #f (lookup-node path)))  ;; unfortunate API kink
                    (nts (if node (or (node-timestamp node) 0) 0))
@@ -354,7 +355,7 @@
                        (eq? ntype 'egg)
                        (<= fts nts)
                        'unchanged)
-                  (and (parse-egg/eggdoc pathname path fts)
+                  (and (parse-egg/eggdoc pathname (append root path) fts)
                        (if node 'modified 'added)))))))
     (else
      (error "Invalid egg document type" type))))
@@ -366,7 +367,7 @@
   (with-global-write-lock
    (lambda ()
      (init-working-id-cache!)
-     (let ((rc (parse-one-egg pathname type path force?)))
+     (let ((rc (parse-one-egg pathname type '() path force?)))
        (cond ((eq? rc 'unchanged)
               (print "no changes"))
              (rc
@@ -380,7 +381,7 @@
     (lambda (fn)
       (string-search re:ignore fn))))
 
-(define (parse-egg-directory dir type #!optional force?)
+(define (parse-egg-directory dir type root #!optional force?)
   (let ((egg-count 0) (updated 0))
     (with-global-write-lock
      (lambda ()
@@ -390,7 +391,7 @@
           (for-each (lambda (name)
                       ;; Can't count errors yet as we don't distinguish between non-regular files and errors.
                       ;; Therefore, don't include error/non-regular files in processed report.
-                      (let ((code (parse-one-egg (make-pathname dir name) type #f force?)))
+                      (let ((code (parse-one-egg (make-pathname dir name) type root #f force?)))
                         (when code
                           (set! egg-count (+ egg-count 1)))
                         ;; Must print ONLY after successful parse, otherwise
@@ -410,7 +411,7 @@
                         (let ((pretty-path
                                (string-substitute re:dir "" pathname)))
                           (display pretty-path) (display " -> ") (flush-output)
-                          (let ((code (parse-one-egg pathname type #f force?))) ; eggname printed in parse-egg/eggdoc
+                          (let ((code (parse-one-egg pathname type root #f force?))) ; eggname printed in parse-egg/eggdoc
                             (when code
                               (set! egg-count (+ egg-count 1)))
                             (case code
@@ -609,7 +610,7 @@
        (case type
          ((svnwiki)
           (for-each (lambda (fn)
-                      (let ((code (parse-one-egg fn type #f force?))
+                      (let ((code (parse-one-egg fn type '() #f force?))
                             (name (pathname-file fn)))
                         ;; If file is missing it is recorded as an error but
                         ;; its name is not printed.
