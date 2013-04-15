@@ -353,6 +353,8 @@
             (with-cwd pathname          ;; Possibly trap and warn on directory change failure.
                       (lambda ()
                         (let* ((basename (pathname-file pathname))
+                               ;; Note we don't treat "index" specially here (nor can we)
+                               ;; so we can't move index treatment to a higher level.
                                (path (append root
                                              (or path `(,basename)))))
                           (parse-egg-directory (current-directory) type path force?))
@@ -418,7 +420,7 @@
                           ((added modified)
                            (set! updated (+ updated 1))
                            (print
-                            (string-intersperse `(,@root ,name)
+                            (string-intersperse `(,@root ,name)    ;; "index" shows up as (root index); oh well.
                                                 " ")))
                           ((unchanged)))))
                     (remove ignore-filename? (directory dir))))
