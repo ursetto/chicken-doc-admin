@@ -275,7 +275,7 @@
     (lambda ()
       (force avail?))))
 
-(define (parse-egg/eggdoc fn path timestamp)
+(define (parse-egg/eggdoc fn root path timestamp)
   (unless (eggdoc-svnwiki-available?)
     (##sys#clear-trace-buffer)           ; you are a horrible person
     (error "eggdoc-svnwiki is required but not installed.\nUse `chicken-install eggdoc-svnwiki` to install it."))
@@ -311,7 +311,8 @@
                (error "Node path required for eggdocs"))
              (unless path
                (print name))
-             (let ((path (or path `(,name))))
+             (let* ((path (or path `(,name)))
+                    (path (append root path)))
                (parse-egg/svnwiki (open-input-string text)
                                   path timestamp)))))))
 
@@ -321,6 +322,7 @@
 ;; The egg name SHOULD be printed to stdout if it is determined
 ;; programmatically (i.e. if PATH is #f); that is either done here
 ;; or in the individual parser if necessary.
+;; For svnwiki, does recursive traversal of directories.  This is not supported for eggdoc.
 ;; Returns #f if the parse fails (currently, if error or not a regular file).
 ;; Returns 'added if the node was new, 'modified if the node existed but was modified,
 ;; and 'unchanged if the node was unchanged (based on timestamp comparison).
@@ -332,7 +334,10 @@
      (cond ((regular-file? pathname)
             (let* ((basename (pathname-file pathname))
                    (path (append root
-                                 (or path `(,basename))))
+                                 (or path
+                                     (if (string=? basename "index")
+                                         '()
+                                         `(,basename)))))
                    (fts (file-modification-time pathname)))
               (let* ((node (handle-exceptions e #f (lookup-node path))) ;; unfortunate API kink
                      (nts (if node (or (node-timestamp node) 0) 0))
@@ -350,7 +355,7 @@
                         (let* ((basename (pathname-file pathname))
                                (path (append root
                                              (or path `(,basename)))))
-                          (parse-egg-directory (current-directory) type path force?)) ;; path??
+                          (parse-egg-directory (current-directory) type path force?))
                         )))
            (else #f)))
     ((eggdoc)
@@ -365,7 +370,7 @@
                        (eq? ntype 'egg)
                        (<= fts nts)
                        'unchanged)
-                  (and (parse-egg/eggdoc pathname (append root path) fts)
+                  (and (parse-egg/eggdoc pathname root path fts)
                        (if node 'modified 'added)))))))
     (else
      (error "Invalid egg document type" type))))
