@@ -329,20 +329,30 @@
 (define (parse-one-egg pathname type root path force?)
   (case type
     ((svnwiki)
-     (and (regular-file? pathname)
-          (let* ((basename (pathname-file pathname))
-                 (path (append root
-                               (or path `(,basename))))
-                 (fts (file-modification-time pathname)))
-            (let* ((node (handle-exceptions e #f (lookup-node path)))  ;; unfortunate API kink
-                   (nts (if node (or (node-timestamp node) 0) 0))
-                   (ntype (if node (node-type node) 'none)))
-              (or (and (not force?)
-                       (eq? ntype 'egg)
-                       (<= fts nts)
-                       'unchanged)
-                  (and (parse-egg/svnwiki pathname path fts)
-                       (if node 'modified 'added)))))))
+     (cond ((regular-file? pathname)
+            (let* ((basename (pathname-file pathname))
+                   (path (append root
+                                 (or path `(,basename))))
+                   (fts (file-modification-time pathname)))
+              (let* ((node (handle-exceptions e #f (lookup-node path))) ;; unfortunate API kink
+                     (nts (if node (or (node-timestamp node) 0) 0))
+                     (ntype (if node (node-type node) 'none)))
+                (or (and (not force?)
+                         (eq? ntype 'egg)
+                         (<= fts nts)
+                         'unchanged)
+                    (and (parse-egg/svnwiki pathname path fts)
+                         (if node 'modified 'added))))))
+           ((and (directory? pathname)
+                 (file-execute-access? pathname))
+            (with-cwd pathname          ;; Possibly trap and warn on directory change failure.
+                      (lambda ()
+                        (let* ((basename (pathname-file pathname))
+                               (path (append root
+                                             (or path `(,basename)))))
+                          (parse-egg-directory (current-directory) type path force?)) ;; path??
+                        )))
+           (else #f)))
     ((eggdoc)
      (and (regular-file? pathname)
           (let ((fts (file-modification-time pathname)))
@@ -377,6 +387,8 @@
 (define ignore-filename?
   ;; Ignore not just #*# but #* due to issue with r/w invariance on sharp-syntax
   ;; in older Chicken.
+  ;; FIXME: Possibly ignore every extension except none and .wiki, in case we encounter images
+  ;; etc. in the wiki.
   (let ((re:ignore (regexp "^[#.]|\\.swp$|~$")))
     (lambda (fn)
       (string-search re:ignore fn))))
