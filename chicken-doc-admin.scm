@@ -429,13 +429,18 @@
                         ;; Must print ONLY after successful parse, otherwise
                         ;; directories etc. will show up.  Any parse warnings
                         ;; will occur before the name appears.
-                        (case code
-                          ((added modified)
-                           (set! updated (+ updated 1))
-                           (print (string-intersperse path " ")))  ;; FIXME: root index will print as blank line.
-                          ((unchanged))
-                          ((directory)) ;; Since this can never be "updated", maybe it shouldn't +1 egg-count
-                          )))
+                        (let ((spath (string-intersperse path " ")))
+                          (case code
+                            ((added)
+                             (set! updated (+ updated 1))
+                             (print "A " spath))
+                            ((modified)
+                             (set! updated (+ updated 1))
+                             (print "M " spath))
+                            ((unchanged))
+                            ((directory)) ;; Since this can never be "updated", maybe it shouldn't +1 egg-count
+                            ((#f)
+                             (print "? " spath))))))
                     (remove ignore-filename? (directory dir))))
 
          ((eggdoc)
@@ -456,8 +461,10 @@
          (else
           (error "Invalid egg directory type" type)))
        (commit-working-id-cache!)
+
+       (display "; ")
        (when (pair? root)
-         (printf "~a/ " (string-intersperse root " ")))
+         (printf "~a :: " (string-intersperse root " ")))
        (printf "~a eggs processed, ~a updated\n"
                egg-count updated)))))
 
@@ -671,7 +678,7 @@
          (else
           (error "Invalid installed doc type" type)))
        (commit-working-id-cache!)
-       (printf "~a eggs processed, ~a updated~a\n" egg-count updated
+       (printf "; ~a eggs processed, ~a updated~a\n" egg-count updated
                (if (> errors 0)
                    (sprintf ", ~a errors" errors)
                    ""))))
