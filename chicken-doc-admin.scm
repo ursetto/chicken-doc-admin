@@ -412,7 +412,9 @@
                         (case code
                           ((added modified)
                            (set! updated (+ updated 1))
-                           (print name))
+                           (print
+                            (string-intersperse `(,@root ,name)
+                                                " ")))
                           ((unchanged)))))
                     (remove ignore-filename? (directory dir))))
 
