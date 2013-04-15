@@ -432,7 +432,7 @@
                         (case code
                           ((added modified)
                            (set! updated (+ updated 1))
-                           (print (string-intersperse path " ")))  ;; FIXME: root index will print as blank line.
+                           (print path))  ;; FIXME: root index will print as blank line.
                           ((unchanged))
                           ((directory)) ;; Since this can never be "updated", maybe it shouldn't +1 egg-count
                           )))
@@ -457,7 +457,7 @@
           (error "Invalid egg directory type" type)))
        (commit-working-id-cache!)
        (when (pair? root)
-         (printf "~a/ " (string-intersperse root " ")))
+         (printf "~a " root))
        (printf "~a eggs processed, ~a updated\n"
                egg-count updated)))))
 
