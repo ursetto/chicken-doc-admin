@@ -1,2 +1,8 @@
-cdoc.txt
-retag.pl
+tst/
+wiki/
+*.import.*
+*.swp
+.svn
+.~
+*.so
+chicken-doc-admin

@@ -10,7 +10,7 @@
       (print "usage: " (program-name) " COMMAND")
       (print "  -l             list repository information")
       (print "  -i             initialize repository non-destructively")
-      (print "  -e dir         process egg directory DIR")
+      (print "  -e dir  [root] process egg directory DIR [and store under node ROOT]")
       (print "  -E file [path] process egg file FILE [and store to node PATH]")
       (print "  -m dir         process manual directory DIR")
       (print "  -M file [path] process manual file FILE [and store to node PATH]")
@@ -53,7 +53,10 @@
                   (loop type r #t))
                  ((string=? o "-e")
                   (unless (pair? r) (usage))
-                  (parse-egg-directory (car r) type force?))
+                  (parse-egg-directory (car r) type
+                                       ;; root path specification
+                                       (cdr r)
+                                       force?))
                  ((string=? o "-m")
                   (unless (pair? r) (usage))
                   (parse-man-directory (car r) type force?))
