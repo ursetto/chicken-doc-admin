@@ -429,12 +429,10 @@
 
 ;; Internal interface.
 (define (parse-eggdir dir type root #!optional force?)
-  (let ((egg-count 0) (updated 0))
+  (let ((egg-count 0) (updated 0) (errors 0))
     (case type
       ((svnwiki)
        (for-each (lambda (name)
-                   ;; Can't count errors yet as we don't distinguish between non-regular files and errors.
-                   ;; Therefore, don't include error/non-regular files in processed report.
                    (let* ((pathname (make-pathname dir name))
                           ;; (We could move name portion from pathname to path arg.)
                           (code (parse-one-egg pathname type root #f force?))
@@ -454,10 +452,10 @@
                           (print "M " spath))
                          ((unchanged))
                          ((directory)) ;; Since this can never be "updated", maybe it shouldn't +1 egg-count
-                         ((#f)
+                         ((#f)         ;; returned on both non-regular file and on fatal parse error
+                          (set! errors (+ errors 1))
                           (print "? " spath))))))
                  (remove ignore-filename? (directory dir))))
-
       ((eggdoc)
        (print "Gathering egg information...")
        (let ((re:dir (irregex `(: bos ,(make-pathname dir ""))))) ; strip off dir name
@@ -471,7 +469,9 @@
                          (case code
                            ((added modified)
                             (set! updated (+ updated 1)))
-                           ((unchanged))))))
+                           ((unchanged))
+                           ((#f)
+                            (set! errors (+ errors 1)))))))
                    (gather-eggdoc-pathnames dir))))
       (else
        (error "Invalid egg directory type" type)))
@@ -482,8 +482,10 @@
     (display "; ")
     (when (pair? root)
       (printf "~a :: " (string-intersperse root " ")))
-    (printf "~a eggs processed, ~a updated\n"
-            egg-count updated)))
+    (printf "~a eggs processed, ~a updated~a\n" egg-count updated
+            (if (> errors 0)
+                (sprintf ", ~a errors" errors)
+                ""))))
 
 ;; Public (toplevel) command interface.
 (define (parse-egg-directory dir type root #!optional force?)
@@ -628,7 +630,7 @@
              (else #f))))))
 
 (define (parse-man-directory dir type #!optional force?)
-  (let ((egg-count 0) (updated 0))
+  (let ((egg-count 0) (updated 0) (errors 0))
     (with-global-write-lock
      (lambda ()
        (init-working-id-cache!)
@@ -639,15 +641,24 @@
                         (when code
                           (set! egg-count (+ egg-count 1)))
                         (case code
-                          ((added modified)
+                          ((added)
                            (set! updated (+ updated 1))
-                           (print name))
-                          ((unchanged)))))
+                           (print "A " name))
+                          ((modified)
+                           (set! updated (+ updated 1))
+                           (print "M " name))
+                          ((unchanged))
+                          ((#f)
+                           (set! errors (+ errors 1))
+                           (print "? " name)))))
                     (remove ignore-filename? (directory dir))))
          (else
           (error "Invalid man directory type" type)))
        (commit-working-id-cache!)
-       (printf "~a man pages processed, ~a updated\n" egg-count updated)))))
+       (printf "; ~a man pages processed, ~a updated~a\n" egg-count updated
+               (if (> errors 0)
+                   (sprintf ", ~a errors" errors)
+                   ""))))))
 
 ;; If names is null, look for all .wiki docs in the repository.  Otherwise,
 ;; if names are explicitly provided, look for matching .wiki docs (and record an error
@@ -696,6 +707,7 @@
                            (print "M " name))
                           ((unchanged))
                           ((#f)
+                           (set! errors (+ errors 1))
                            (print "? " name)))))
                     (if (pair? names)
                         (wiki-doc-filenames names)
