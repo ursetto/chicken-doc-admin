@@ -382,21 +382,22 @@
                           (parse-eggdir (current-directory) type path force?)
                           'directory)
                         )))
-           (else #f)))
+           (else 'skipped)))
     ((eggdoc)
-     (and (regular-file? pathname)
-          (let ((fts (file-modification-time pathname)))
-            ;; Force node to #f, leave code scaffolding in place for future timestamp handling
-            (let* ((node #f    ;; (handle-exceptions e #f (lookup-node path))
-                         )
-                   (nts (if node (or (node-timestamp node) 0) 0))
-                   (ntype (if node (node-type node) 'none)))
-              (or (and (not force?)
-                       (eq? ntype 'egg)
-                       (<= fts nts)
-                       'unchanged)
-                  (and (parse-egg/eggdoc pathname root path fts)
-                       (if node 'modified 'added)))))))
+     (cond ((regular-file? pathname)
+            (let ((fts (file-modification-time pathname)))
+              ;; Force node to #f, leave code scaffolding in place for future timestamp handling
+              (let* ((node #f ;; (handle-exceptions e #f (lookup-node path))
+                           )
+                     (nts (if node (or (node-timestamp node) 0) 0))
+                     (ntype (if node (node-type node) 'none)))
+                (or (and (not force?)
+                         (eq? ntype 'egg)
+                         (<= fts nts)
+                         'unchanged)
+                    (and (parse-egg/eggdoc pathname root path fts)
+                         (if node 'modified 'added))))))
+           (else 'skipped)))
     (else
      (error "Invalid egg document type" type))))
 
@@ -437,7 +438,8 @@
                           ;; (We could move name portion from pathname to path arg.)
                           (code (parse-one-egg pathname type root #f force?))
                           (path (get-egg-path pathname root #f)))
-                     (when code
+                     (unless (or (eq? code 'skipped)
+                                 (eq? code 'directory))
                        (set! egg-count (+ egg-count 1)))
                      ;; Must print ONLY after successful parse, otherwise
                      ;; directories etc. will show up.  Any parse warnings
@@ -451,10 +453,14 @@
                           (set! updated (+ updated 1))
                           (print "M " spath))
                          ((unchanged))
-                         ((directory)) ;; Since this can never be "updated", maybe it shouldn't +1 egg-count
-                         ((#f)         ;; returned on both non-regular file and on fatal parse error
+                         ((directory))
+                         ((skipped))   ;; returned on non-regular file (including links)
+                         ((unknown))   ;; not currently used for eggs
+                         ((#f)         ;; returned on fatal parse error
                           (set! errors (+ errors 1))
-                          (print "? " spath))))))
+                          (print "E " spath))
+                         (else
+                          (error "unknown parse return code" code))))))
                  (remove ignore-filename? (directory dir))))
       ((eggdoc)
        (print "Gathering egg information...")
@@ -464,14 +470,17 @@
                             (string-substitute re:dir "" pathname)))
                        (display pretty-path) (display " -> ") (flush-output)
                        (let ((code (parse-one-egg pathname type root #f force?))) ; eggname printed in parse-egg/eggdoc
-                         (when code
-                           (set! egg-count (+ egg-count 1)))
+                         (unless (eq? code 'skipped)
+                          (set! egg-count (+ egg-count 1)))
                          (case code
                            ((added modified)
                             (set! updated (+ updated 1)))
                            ((unchanged))
+                           ((skipped))
                            ((#f)
-                            (set! errors (+ errors 1)))))))
+                            (set! errors (+ errors 1)))
+                           (else
+                            (error "unknown parse return code" code))))))
                    (gather-eggdoc-pathnames dir))))
       (else
        (error "Invalid egg directory type" type)))
@@ -515,18 +524,21 @@
     ((svnwiki)
      (let ((name (pathname-file pathname)))
        (let ((path (or path (man-filename->path name))))
-         (and (regular-file? pathname)
-              path
-              (let* ((fts (file-modification-time pathname))
-                     (node (handle-exceptions e #f (lookup-node path)))
-                     (nts (if node (or (node-timestamp node) 0) 0))
-                     (ntype (if node (node-type node) 'none)))
-                (or (and (not force?)
-                         (eq? ntype 'unit)   ;; FIXME unit?  what an odd design decision
-                         (<= fts nts)
-                         'unchanged)
-                    (and (parse-man/svnwiki pathname path name fts)
-                         (if node 'modified 'added))))))))
+         (cond ((symbolic-link? pathname) 'skipped)
+               ((and (regular-file? pathname)
+                     path)
+                (let* ((fts (file-modification-time pathname))
+                       (node (handle-exceptions e #f (lookup-node path)))
+                       (nts (if node (or (node-timestamp node) 0) 0))
+                       (ntype (if node (node-type node) 'none)))
+                  (or (and (not force?)
+                           (eq? ntype 'unit) ;; FIXME unit?  what an odd design decision
+                           (<= fts nts)
+                           'unchanged)
+                      (and (parse-man/svnwiki pathname path name fts)
+                           (if node 'modified 'added)))))
+               ((not path) 'unknown)
+               (else 'skipped)))))
     (else
      (error "Invalid man document type" type))))
 
@@ -638,7 +650,7 @@
          ((svnwiki)
           (for-each (lambda (name)
                       (let ((code (parse-one-man (make-pathname dir name) 'svnwiki #f force?)))
-                        (when code
+                        (unless (eq? code 'skipped)
                           (set! egg-count (+ egg-count 1)))
                         (case code
                           ((added)
@@ -648,9 +660,14 @@
                            (set! updated (+ updated 1))
                            (print "M " name))
                           ((unchanged))
+                          ((skipped))   ;; don't be verbose
                           ((#f)
                            (set! errors (+ errors 1))
-                           (print "? " name)))))
+                           (print "E " name))
+                          ((unknown)
+                           (print "? " name))       ;; not an error; just a man with no path
+                          (else
+                           (error "unknown parse return code" code)))))
                     (remove ignore-filename? (directory dir))))
          (else
           (error "Invalid man directory type" type)))
@@ -692,12 +709,7 @@
           (for-each (lambda (fn)
                       (let ((code (parse-one-egg fn type '() #f force?))
                             (name (pathname-file fn)))
-                        ;; If file is missing it is recorded as an error but
-                        ;; its name is not printed.
-                        (if code
-                            (set! egg-count (+ egg-count 1))
-                            ;; Safe to count errors here, as *.wiki should be regular files
-                            (set! errors (+ errors 1)))
+                        (set! egg-count (+ egg-count 1))
                         (case code
                           ((added)
                            (set! updated (+ updated 1))
@@ -706,9 +718,12 @@
                            (set! updated (+ updated 1))
                            (print "M " name))
                           ((unchanged))
+                          ((skipped unknown)
+                           (set! errors (+ errors 1))   ;; here, skipping is considered an error, as all *.wiki should be regular files
+                           (print "? " name))
                           ((#f)
                            (set! errors (+ errors 1))
-                           (print "? " name)))))
+                           (print "E " name)))))
                     (if (pair? names)
                         (wiki-doc-filenames names)
                         (glob-wiki-docs))))
