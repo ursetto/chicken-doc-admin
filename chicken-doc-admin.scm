@@ -257,16 +257,33 @@
 (define (write-manshell path name doc timestamp)
   (write-doc-node path doc 'unit name timestamp))
 
+(define (warning/exception str e)
+  (apply warning
+         (string-append (if str (string-append str ": ") "")
+                        (let ((loc ((condition-property-accessor 'exn 'location) e)))
+                          (if loc (conc loc ": ") ""))
+                        (or ((condition-property-accessor 'exn 'message) e) ""))
+         ((condition-property-accessor 'exn 'arguments) e)))
+(define (warn-on-exception str thunk)
+  (handle-exceptions e
+      (begin (warning/exception str e)
+             #f)
+    (thunk)))
+
 ;; FIXME: PATH is expected to be list of strings, due to requirement in write-eggshell
 (define (parse-egg/svnwiki fn-or-port path timestamp)
-  (let ((sxml-doc (parse-svnwiki fn-or-port)))
-    (write-eggshell path sxml-doc timestamp)
-    #t))
+  (let ((sxml-doc (warn-on-exception "Parse error" (lambda () (parse-svnwiki fn-or-port)))))
+    (and sxml-doc
+         (begin
+           (write-eggshell path sxml-doc timestamp)
+           #t))))
 
 (define (parse-man/svnwiki fn-or-port path name timestamp)
-  (let ((sxml-doc (parse-svnwiki fn-or-port)))
-    (write-manshell path name sxml-doc timestamp)
-    #t))
+  (let ((sxml-doc (warn-on-exception "Parse error" (lambda () (parse-svnwiki fn-or-port)))))
+    (and sxml-doc
+         (begin
+           (write-manshell path name sxml-doc timestamp)
+           #t))))
 
 (define eggdoc-svnwiki-available?
   (let ((avail? (delay (condition-case
