@@ -553,54 +553,90 @@
               (commit-working-id-cache!)))
        rc))))
 
+;; Design goal is for man pages for both Chicken 4 and 5 to work without having to
+;; distinguish version at the command line (or ideally, even heuristically).
+;; So we make the following assumptions:
+;;   - Pages that kept their old names also keep their old node paths.
+;;   - Old node paths in the virtual (chicken) namespace do not conflict with
+;;     new, real modules in (chicken).  Example: 'read-syntax', 'type',
+;;   - (chicken) "The User's Manual" has a replacement that is module-oriented,
+;;     or does not exist in the 5.
+;;   - Modules like (chicken process signal) do not have a "signal" defsig in
+;;     (chicken process), which would cause a conflict.
 (define man-filename->path
   (let ((re:unit (irregex "^Unit (.+)"))
+        (re:module-path (irregex "^Module (\\([^)]+\\))$"))
+        (re:module (irregex "^Module (.+)$"))
         (symbolify-list (lambda (x) (and x (map (lambda (x)
                                              (if (symbol? x) x (string->symbol x)))
                                            x)))))
     (lambda (t)
       (symbolify-list
-       (cond ((string-search re:unit t) => cdr) ; ("lolevel")
+       ;; chicken 5 specific
+       (cond ((string-search re:module-path t) =>
+              (lambda (search-result)
+                (let ((path-string (cadr search-result)))
+                  (condition-case
+                   (map (lambda (x) (->string x))
+                        (with-input-from-string path-string read))
+                   (exn (exn)
+                        ;; Consider letting the caller handle this.
+                        (print "Error parsing man filename: "
+                               ((condition-property-accessor 'exn 'location) exn)
+                               ": "
+                               ((condition-property-accessor 'exn 'message) exn)
+                               ": "
+                               ((condition-property-accessor 'exn 'arguments) exn))
+                        #f)))))
+             ((string-search re:module t) => cdr) ; Module r5rs -> ("r5rs")
+             ((string=? t "Debugging")
+              '(chicken debugging))
+             ((string=? t "Extension tools")
+              '(chicken eggs tools))
+             ((string=? t "Egg specification format")
+              '(chicken eggs format))
+             ;; "Included modules" is the C5 pointer to the modules list.
+             ;; (chicken modules included) may not be the best place to put this,
+             ;; but it doesn't pollute the namespace any further.
+             ((string=? t "Included modules")
+              '(chicken modules included))
+             ((string=? t "Units and linking model")
+              ;; Iffy naming. This page should probably not take up valuable namespace.
+              '(chicken linking))
+
+             ;; common between C4 and C5
              ((string=? t "Interface to external functions and variables")
               '(foreign))
              ((string=? t "Accessing external objects")
-              '(foreign access))
+              '(foreign access))  ; Exists in C5, but is for examples.
              ((string=? t "C interface")
               '(foreign c-interface))
              ((string=? t "Embedding")
               '(foreign embedding))
              ((string=? t "Foreign type specifiers")
               '(foreign types))
-             ((string=? t "Callbacks")
-              '(foreign callbacks))
-             ((string=? t "Locations")
-              '(foreign locations))
-             ((string=? t "Other support procedures")
-              '(foreign support))
              ((string=? t "Declarations")
-              '(chicken declarations))
-             ((string=? t "Parameters")
-              '(chicken parameters))
-             ((string=? t "Exceptions")
-              '(chicken exceptions))
-             ((string=? t "Modules and macros")    ;; legacy
-              '(chicken modules))
+              '(chicken declarations))    ; Might be more approriate in (csc declarations).
+             ((string=? t "Extensions to the standard")
+              '(chicken standard-extensions))
              ((string=? t "Modules")
               '(chicken modules))
-             ((string=? t "Macros")
-              '(chicken macros))
-             ((string=? t "Non-standard macros and special forms")
-              '(chicken special-forms))
-             ((string=? t "The R5RS standard")
-              '(scheme))
+             ;; Note: (chicken type) is the C5 module and its stub page points to
+             ;; (chicken types) for documentation.
+             ((string=? t "Types")
+              '(chicken types))
              ((string=? t "Using the interpreter")
               '(csi))
              ((string=? t "Using the compiler")
               '(csc))
+
              ;; These are general reading pages which do not
              ;; contain identifiers.  They're in (chicken)
              ;; right now even though they don't really reside
-             ;; in that namespace.
+             ;; in that namespace; in the C5 module system there is
+             ;; a higher chance of conflict than in C4.
+             ((string=? t "The User's Manual")
+              '(chicken))       ; Chicken root node; no conflict since no (chicken) module.
              ((string=? t "Extensions")
               '(chicken eggs))
              ((string=? t "Acknowledgements")
@@ -613,32 +649,50 @@
               '(chicken cross-development))
              ((string=? t "Data representation")
               '(chicken data-representation))
-             ((string=? t "Deviations from the standard")
-              '(chicken standard-deviations))
-             ((string=? t "Extensions to the standard")
-              '(chicken standard-extensions))
-             ((string=? t "Getting started")
-              '(chicken intro))
-             ((string=? t "Non-standard read syntax")
-              '(chicken read-syntax))
-             ((string=? t "Basic mode of operation")
-              '(chicken basic-operation))
              ((string=? t "Deployment")
               '(chicken deployment))
-             ((string=? t "faq")
-              '(chicken faq))
-             ;; Hack because many internal links to "FAQ" exist.
-             ;; Possibly we should ignore case altogether.
-             ((string=? t "FAQ")
-              '(chicken faq))
+             ((string=? t "Deviations from the standard")
+              '(chicken standard-deviations))
+             ((string=? t "Getting started")
+              '(chicken intro))
+             
+             ;; C4 specific
+             
+             ((string-search re:unit t) => cdr) ; Unit tcp -> ("tcp")
+             ;; A few of these were moved to sections under other topics in C5,
+             ;; so any links to these left in the C5 manual will not resolve.
+             ((string=? t "Callbacks")
+              '(foreign callbacks))      ; Moved to (chicken foreign) section
+             ((string=? t "Locations")
+              '(foreign locations))      ; Moved to (chicken foreign) section
+             ((string=? t "Other support procedures") 
+              '(foreign support))        ; Moved to (chicken process-context) in C5.
+             ((string=? t "Parameters")
+              '(chicken parameters))     ; Moved to (chicken base) section in C5.
+             ((string=? t "The R5RS standard")
+              '(scheme))                 ; Handled by `Module scheme` in C5.
+             ((string=? t "Non-standard read syntax")
+              ;; Moved to (chicken standard-extensions) in C5; thus the
+              ;; (chicken read-syntax) C5 module does not conflict.
+              '(chicken read-syntax))
+             ((string-ci=? t "faq")  ; use ci compare because links to 'faq' and 'FAQ' both exist
+              '(chicken faq))        ; FAQ removed in C5.
+             ((string=? t "Exceptions")
+              '(chicken exceptions))    ; Moved to (chicken condition) in C5
+             ((string=? t "Macros")
+              '(chicken macros))     ; Moved to (chicken syntax) in C5
+             ((string=? t "Non-standard macros and special forms")
+              '(chicken special-forms))        ; Moved elsewhere, e.g. (chicken base) in C5.
+             ((string=? t "Basic mode of operation")
+              '(chicken basic-operation))   ; Removed in C5
              ((string=? t "Supported language")
-              '(chicken language))
-             ((string=? t "Types")
-              '(chicken types))
-             ;; User's Manual is kind of apropos, though "Supported language"
-             ;; actually resides at toplevel.
-             ((string=? t "The User's Manual")
-              '(chicken))
+              '(chicken language))    ; Removed in C5; moved to User's Manual and Included Modules.
+
+             ;; very legacy
+
+             ((string=? t "Modules and macros")
+              '(chicken modules))
+             
              (else #f))))))
 
 (define (parse-man-directory dir type #!optional force?)
