@@ -722,7 +722,8 @@
                            (print "? " name))       ;; not an error; just a man with no path
                           (else
                            (error "unknown parse return code" code)))))
-                    (remove ignore-filename? (directory dir))))
+                    (sort (remove ignore-filename? (directory dir))
+                          string<?)))
          (else
           (error "Invalid man directory type" type)))
        (commit-working-id-cache!)
