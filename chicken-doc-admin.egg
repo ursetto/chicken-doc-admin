@@ -1,0 +1,23 @@
+;;                          -*- scheme -*-
+(
+(synopsis "Administer Chicken documentation locally")
+(author "Jim Ursetto")
+(license "BSD")
+(category doc-tools)
+(version "0.4.8")
+(dependencies matchable
+              (chicken-doc 0.5.0)
+              html-parser
+              sxml-transforms
+              (svnwiki-sxml 0.2.12)
+              srfi-1 srfi-13 srfi-69
+              )
+(components (extension chicken-doc-admin
+                       (source-dependencies "chicken-doc-parser.scm")
+                       (modules chicken-doc-admin chicken-doc-parser))
+            (program chicken-doc-admin-cmd
+                     (install-name "chicken-doc-admin")
+                     (source "chicken-doc-admin-cmd.scm")
+                     (component-dependencies chicken-doc-admin)))
+)
+;; vi: ft=scheme et

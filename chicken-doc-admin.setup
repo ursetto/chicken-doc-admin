@@ -1,4 +1,4 @@
-;;; chicken-doc-admin
+;;; chicken-doc-admin    -*- scheme -*-
 (define version "0.4.8")
 
 (compile -s -O2 -d1 -S chicken-doc-admin.scm -j chicken-doc-admin -j chicken-doc-parser)
@@ -15,3 +15,5 @@
  'chicken-doc-admin-cmd
  '("chicken-doc-admin")
  `((version ,version)))
+
+;; vi: ft=scheme et
