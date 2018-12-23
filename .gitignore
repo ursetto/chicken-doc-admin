@@ -1,8 +1,12 @@
 tst/
 wiki/
 *.import.*
+*.install.sh
+*.build.sh
+*.link
 *.swp
 .svn
 .~
 *.so
-chicken-doc-admin
+*.o
+chicken-doc-admin-cmd

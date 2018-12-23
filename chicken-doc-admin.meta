@@ -1,3 +1,4 @@
+;; -*- scheme -*-
 ((egg "chicken-doc-admin.egg")
  (synopsis "Administer Chicken documentation locally")
  (author "Jim Ursetto")
@@ -7,5 +8,8 @@
  (needs matchable (chicken-doc 0.4.0)
  	html-parser sxml-transforms
         (svnwiki-sxml 0.2.7)
+        regex
  )
  )
+
+;; vi: ft=scheme et

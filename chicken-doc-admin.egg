@@ -11,6 +11,7 @@
               sxml-transforms
               (svnwiki-sxml 0.2.12)
               srfi-1 srfi-13 srfi-69
+              regex
               )
 (components (extension chicken-doc-admin
                        (source-dependencies "chicken-doc-parser.scm")
