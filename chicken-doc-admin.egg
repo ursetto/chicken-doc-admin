@@ -14,7 +14,7 @@
               regex
               )
 (components (extension chicken-doc-admin
-                       (source-dependencies "chicken-doc-parser.scm")
+                       (source-dependencies "chicken-doc-parser.scm" "file-locking.scm")
                        (modules chicken-doc-admin chicken-doc-parser))
             (program chicken-doc-admin-cmd
                      (install-name "chicken-doc-admin")

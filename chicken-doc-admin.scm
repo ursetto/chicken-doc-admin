@@ -1,6 +1,7 @@
 ;;; chicken-doc-admin
 
 (include "chicken-doc-parser.scm")
+(include "file-locking.scm")
 
 (module chicken-doc-admin
 ;; Used by chicken-doc-admin command
@@ -50,7 +51,7 @@
           (chicken condition)
           (rename (chicken file)
                   (file-executable? file-execute-access?))   ; c4 compat
-          (chicken file posix)
+          (except (chicken file posix) file-lock/blocking)   ; 5.0.0 bugfix in file-locking.scm
           (chicken foreign)
           (chicken format)
           (rename (only (chicken io) read-list)
@@ -72,6 +73,7 @@
  )
 
 (import chicken-doc-parser)
+(import chicken-doc-file-locking)
 
 
 ;;; Locking
@@ -901,7 +903,9 @@
         (lambda () (write (hash-table->alist ht))))
       #+mingw32 (when (file-exists? fn)
                   (delete-file fn)) ;; Lose atomic update on MinGW.
-      (rename-file tmp-fn fn)
+      (cond-expand
+       (chicken-4 (rename-file tmp-fn fn))
+       (else      (rename-file tmp-fn fn 'clobber)))  ;; odd design decision
       (make-id-cache
        ht
        (current-seconds)    ;; (file-modification-time (id-cache-filename))
