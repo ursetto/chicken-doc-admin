@@ -236,7 +236,7 @@
   (let ((r (open-repository* (locate-repository))))
     (let ((version (or (alist-ref 'version (repository-information r)) 0)))
       (case version
-        ((1 2 3)
+        ((1 2 3 4)
          (print "Destroying version " version " repository at " (repository-base r) "...")
          (recursive-delete-directory (repository-base r)))
         (else
