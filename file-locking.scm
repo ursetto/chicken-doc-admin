@@ -1,8 +1,8 @@
 (module chicken-doc-file-locking (file-lock/blocking)
 
-;; Implement fix #1565 for Chicken 5.0.0 in posix#file-lock/blocking (core rev 7729e51103).
-;; This is a terrible UNIX-only hack, prevents compilation on non-UNIX,
-;; and should be removed after 5.0.1 is released.
+;; Implement fix #1565 for Chicken 5.0.0 in posixunix.scm:posix#file-lock/blocking (core rev 7729e51103).
+;; This is a terrible hack, but supported releases of Chicken are rare (5.0.1 is a development release),
+;; so we cannot remove it until at least 5.1.0 or a 5.0.0.x stability release.
 
 (import scheme
         (chicken base)
@@ -12,6 +12,9 @@
         (prefix (chicken file posix) "posix:"))
 
 (define file-lock/blocking)
+
+(cond-expand
+  (unix
 
 ;;; Copied from posixunix.scm (Record locking:)
 
@@ -53,4 +56,11 @@ static C_TLS struct flock C_flock;
 		       (else (err "cannot lock file" lock 'file-lock/blocking)))
 	              lock)))))))
 
+
+   )  ; platform-unix
+  (else
+   (set! file-lock/blocking posix:file-lock/blocking)))   ; actually unimplemented on windows, but that's ok
+
 )
+
+  
