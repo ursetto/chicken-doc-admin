@@ -900,7 +900,12 @@
     (let* ((fn (id-cache-filename c))
            (tmp-fn (string-append fn ".tmp"))) ; fixme: mktmp
       (with-output-to-file tmp-fn
-        (lambda () (write (hash-table->alist ht))))
+        (lambda () (write
+               ;; Ensure keys are strings; avoids read-write invariance issues on read syntax, which through
+               ;; reader bug or version change, may not be readable as a symbol.
+               (map (lambda (p)
+                      (cons (->string (car p)) (cdr p)))
+                    (hash-table->alist ht)))))
       #+mingw32 (when (file-exists? fn)
                   (delete-file fn)) ;; Lose atomic update on MinGW.
       (cond-expand
