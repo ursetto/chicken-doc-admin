@@ -6,7 +6,7 @@
 (category doc-tools)
 (version "0.4.8")
 (dependencies matchable
-              (chicken-doc 0.5.0)
+              (chicken-doc 0.6.0)
               html-parser
               sxml-transforms
               (svnwiki-sxml 0.2.12)
