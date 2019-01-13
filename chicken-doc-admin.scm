@@ -4,8 +4,8 @@
 (include "file-locking.scm")
 
 (cond-expand
- (chicken-4
-  (use chicken-syntax))) ; for eggdoc eval
+ (chicken-4 (use chicken-syntax))  ; for eggdoc eval
+ (else))
 
 (module chicken-doc-admin
 ;; Used by chicken-doc-admin command
