@@ -3,6 +3,10 @@
 (include "chicken-doc-parser.scm")
 (include "file-locking.scm")
 
+(cond-expand
+ (chicken-4
+  (use chicken-syntax))) ; for eggdoc eval
+
 (module chicken-doc-admin
 ;; Used by chicken-doc-admin command
 (refresh-id-cache
@@ -44,7 +48,6 @@
   (import foreign)  ;; for parse-installed-eggs
   (use setup-download)
   (use ports)
-  (use chicken-syntax) ; for eggdoc eval
   )
  (else
   (import (chicken base)
@@ -68,13 +71,11 @@
   (import matchable srfi-1 srfi-13 srfi-69)
   (import chicken-doc)
   (import regex)
-
+  (import chicken-doc-file-locking)
   )
  )
 
 (import chicken-doc-parser)
-(import chicken-doc-file-locking)
-
 
 ;;; Locking
 

@@ -4,7 +4,7 @@
 (compile -s -O2 -d1 -S chicken-doc-admin.scm -j chicken-doc-admin -j chicken-doc-parser)
 (compile -s -O2 -d0 chicken-doc-admin.import.scm)
 (compile -s -O2 -d0 chicken-doc-parser.import.scm)    ; required, unfortunately
-(compile -o chicken-doc-admin -O2 -d1 chicken-doc-admin-cmd.scm)
+(compile -O2 -d1 chicken-doc-admin-cmd.scm)
 
 (install-extension
   'chicken-doc-admin
@@ -13,7 +13,7 @@
 
 (install-program
  'chicken-doc-admin-cmd
- '("chicken-doc-admin")
+ '(("chicken-doc-admin-cmd" "chicken-doc-admin"))
  `((version ,version)))
 
 ;; vi: ft=scheme et

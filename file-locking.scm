@@ -1,3 +1,7 @@
+(cond-expand
+ (chicken-4) ; Module not needed nor expected for Chicken 4.
+ (else
+  
 (module chicken-doc-file-locking (file-lock/blocking)
 
 ;; Implement fix #1565 for Chicken 5.0.0 in posixunix.scm:posix#file-lock/blocking (core rev 7729e51103).
@@ -64,3 +68,4 @@ static C_TLS struct flock C_flock;
 )
 
   
+))
