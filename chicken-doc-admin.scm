@@ -1,8 +1,11 @@
 ;;; chicken-doc-admin
 
 (include "chicken-doc-parser.scm")
+(include "file-locking.scm")
 
-(use chicken-syntax) ; for eggdoc eval
+(cond-expand
+ (chicken-4 (use chicken-syntax))  ; for eggdoc eval
+ (else))
 
 (module chicken-doc-admin
 ;; Used by chicken-doc-admin command
@@ -18,14 +21,59 @@
  man-filename->path       ; for chickadee
  )
 
-(import scheme chicken)
-(require-library chicken-doc)
-(import chicken-doc)
-(use matchable srfi-69 posix regex data-structures files extras srfi-13 srfi-1)
-(import irregex)
-(import foreign)  ;; for parse-installed-eggs
-(use setup-download)
-(use ports)
+(import scheme)
+
+;; Chicken 5 support:
+;;  eggdoc parsing (-e) will not work:
+;;  - gather-egg-information and locate-egg/local have been removed from Chicken 5. You would need
+;;    to port the gather-egg-information egg to Chicken 5, and export locate-egg from there, to
+;;    restore `-t eggdoc` access.
+;;  eggdoc parsing (-E) will not work:
+;;  - requires porting eggdoc-sxml to Chicken 5, and also figuring out / removing the eval code
+;;    which allows eggdoc-sxml to be loaded dynamically.
+;;  host parsing (-H) may or may not work for target compilers:
+;;  - For target mode, uses foreign function calls to get repo location. Would like to replace this with an actual
+;;    API. Also may not be worth it; functionality not likely used. Virtually no eggs install .wiki files,
+;;    and target mode is probably even less used. For host eggs, repository-path API is used.
+
+
+;; FIXME: Remove regex dep, if possible. string-substitute and string-search have different APIs.
+;; FIXME: Remove foreign dep in C5, if we can get binary versions a standard way.
+(cond-expand
+ (chicken-4
+  (import chicken)
+  (use chicken-doc)
+  (use matchable regex srfi-69 posix data-structures files extras srfi-13 srfi-1)
+  (import irregex)
+  (import foreign)  ;; for parse-installed-eggs
+  (use setup-download)
+  (use ports)
+  )
+ (else
+  (import (chicken base)
+          (chicken condition)
+          (rename (chicken file)
+                  (file-executable? file-execute-access?))   ; c4 compat
+          (except (chicken file posix) file-lock/blocking)   ; 5.0.0 bugfix in file-locking.scm
+          (chicken foreign)
+          (chicken format)
+          (rename (only (chicken io) read-list)
+                  (read-list read-file)) ; c4 compat
+          (chicken irregex)
+          (chicken platform)
+          (chicken pathname)
+          (chicken port)
+          (chicken pretty-print)
+          (chicken process-context)
+          (chicken sort)
+          (chicken string)
+          (chicken time))
+  (import matchable srfi-1 srfi-13 srfi-69)
+  (import chicken-doc)
+  (import regex)
+  (import chicken-doc-file-locking)
+  )
+ )
 
 (import chicken-doc-parser)
 
@@ -63,11 +111,11 @@
 
 (define (with-cwd dir thunk)
   (let ((old (current-directory)))
-    (current-directory dir)
-    (handle-exceptions exn (begin (current-directory old)
+    (change-directory dir)
+    (handle-exceptions exn (begin (change-directory old)
                                   (signal exn))
       (let ((rv (thunk)))
-        (current-directory old)
+        (change-directory old)
         rv))))
 
 ;;; Lowlevel
@@ -188,7 +236,7 @@
   (let ((r (open-repository* (locate-repository))))
     (let ((version (or (alist-ref 'version (repository-information r)) 0)))
       (case version
-        ((1 2 3)
+        ((1 2 3 4)
          (print "Destroying version " version " repository at " (repository-base r) "...")
          (recursive-delete-directory (repository-base r)))
         (else
@@ -302,7 +350,7 @@
            (condition-case
             (with-cwd dir         ;; Change to eggdoc's basedir; may need local files
                       (lambda ()       ;; with-cwd not visible in eval, so do it outside
-                        (let ((doc (read-file file))
+                        (let ((doc (with-input-from-file file read-file))  ; c5 read-list expects a port
                               (str (gensym 'str)))
                           (eval `(begin
                                    (use eggdoc) ; eggdoc-svnwiki loaded above
@@ -420,13 +468,13 @@
   ;; in older Chicken.
   ;; Ignore every extension except none and .wiki, in case we encounter images
   ;; etc. in the wiki.  Any eggname with a dot in it will thus be rejected.
-  (let ((re:ignore (regexp "^[#.]|\\.swp$|~$")))
+  (let ((re:ignore (irregex "^[#.]|\\.swp$|~$")))
     (lambda (fn)
       (let ((ext (pathname-extension fn)))
         (or
          (and ext
               (not (string=? ext "wiki")))
-         (string-search re:ignore fn))))))
+         (irregex-search re:ignore fn))))))
 
 ;; Internal interface.
 (define (parse-eggdir dir type root #!optional force?)
@@ -508,16 +556,20 @@
 ;; repository DIR.  Latest tagged version (failing that, trunk) is used.
 ;; Egg name is discarded--caller must gather it from the (name) elt in the doc.
 (define (gather-eggdoc-pathnames dir)
-  (filter-map
-   (lambda (egg)
-     (let ((x (alist-ref 'eggdoc (cdr egg))))
-       (and x
-            (pair? x)      ; the occasional egg may just have (eggdoc)
-            (let* ((egg-name (->string (car egg)))
-                   (filename (car x))
-                   (pathname (locate-egg/local egg-name dir)))
-              (make-pathname pathname filename)))))
-   (gather-egg-information dir)))
+  (cond-expand
+   (chicken-4
+    (filter-map
+     (lambda (egg)
+       (let ((x (alist-ref 'eggdoc (cdr egg))))
+         (and x
+              (pair? x)    ; the occasional egg may just have (eggdoc)
+              (let* ((egg-name (->string (car egg)))
+                     (filename (car x))
+                     (pathname (locate-egg/local egg-name dir)))
+                (make-pathname pathname filename)))))
+     (gather-egg-information dir)))
+   (else
+    (error 'gather-eggdoc-pathnames "eggdoc source is not supported on this version of Chicken"))))
 
 (define (parse-one-man pathname type path force?)
   (case type
@@ -732,20 +784,30 @@
                    (sprintf ", ~a errors" errors)
                    ""))))))
 
-;; If names is null, look for all .wiki docs in the repository.  Otherwise,
-;; if names are explicitly provided, look for matching .wiki docs (and record an error
-;; if not present).  If target? is #t, look for docs in the target repository -- this
-;; will only matter for cross-compilers; for regular compilers, target repo == host repo.
+;; If names is null, look for all .wiki docs in the repository.
+;; If names are explicitly provided, look for matching .wiki docs (and record an error
+;; if not present).  Note: on Chicken 5, looks in the installation repository, not all
+;; repositories, just like chicken-status and chicken-install behave.
+;; 
+;; If target?, look for docs in the target repository. This will only
+;; matter for cross-compilers; for regular compilers, target repo == host repo.
+;; Note: on Chicken 5, the standard target lib repository is searched, but not the "runlib".
+;; It is unclear if this matters.
 (define (parse-installed-eggs names type #!optional force? target?)
   ;; ignored: names
   ;; From chicken-status.scm.  There needs to be an official API for this stuff.
+  ;;
+  ;; In C5, (destination-repository 'target) covers this and the "runlib" directory,
+  ;; but it is not exported from egg-environment.scm.
 
   (define-foreign-variable C_TARGET_LIB_HOME c-string)
   (define-foreign-variable C_BINARY_VERSION int)
   (define (repo-path)
     (if target?
         (make-pathname C_TARGET_LIB_HOME (sprintf "chicken/~a" C_BINARY_VERSION))
-        (repository-path)))
+        (cond-expand
+         (chicken-4 (repository-path))
+         (else      (installation-repository)))))
   (define (glob-wiki-docs)
     ;; shortcut: just look for *.wiki, instead of *.setup-info -> *.wiki
     (glob (make-pathname (repo-path) "*" "wiki")))
@@ -839,10 +901,17 @@
     (let* ((fn (id-cache-filename c))
            (tmp-fn (string-append fn ".tmp"))) ; fixme: mktmp
       (with-output-to-file tmp-fn
-        (lambda () (write (hash-table->alist ht))))
+        (lambda () (write
+               ;; Ensure keys are strings; avoids read-write invariance issues on read syntax, which through
+               ;; reader bug or version change, may not be readable as a symbol.
+               (map (lambda (p)
+                      (cons (->string (car p)) (cdr p)))
+                    (hash-table->alist ht)))))
       #+mingw32 (when (file-exists? fn)
                   (delete-file fn)) ;; Lose atomic update on MinGW.
-      (rename-file tmp-fn fn)
+      (cond-expand
+       (chicken-4 (rename-file tmp-fn fn))
+       (else      (rename-file tmp-fn fn 'clobber)))  ;; odd design decision
       (make-id-cache
        ht
        (current-seconds)    ;; (file-modification-time (id-cache-filename))
